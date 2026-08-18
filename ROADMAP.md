@@ -10,23 +10,23 @@ Plataforma web para la automatización y gestión del ciclo de vida de usuarios 
 [ RRHH ]                                         [ EQUIPO DE IT ]
    │                                                    │
    ▼                                                    ▼
-1. Completa Formulario                              3. Revisa Solicitudes Pendientes
+1. Completa Formulario                               3. Revisa Solicitudes Pendientes
    (Nombre, Apellido, DNI, Legajo,                      │
     Reporta a, Perfil)                                  ▼
-   │                                                4. Click en "Previsualizar Credenciales"
-   ▼                                                   (Genera propuesta de User, Mail, Pass)
+   │                                                 4. Click en "Previsualizar Credenciales"
+   ▼                                                    (Genera propuesta de User, Mail, Pass, Neo, Forti)
 2. Guarda Solicitud en estado "PENDIENTE"               │
                                                         ├─► Opción A: Modificar/Ajustar propuesta
                                                         └─► Opción B: Confirmar y Ejecutar
                                                         │
                                                         ▼
-                                                    5. Se dispara orchestrator.py
-                                                       (Crea AD, Gmail, NeoTel, FortiClient)
+                                                     5. Se dispara orchestrator.py
+                                                        (Crea AD, Gmail, NeoTel, FortiClient)
                                                         │
                                                         ▼
-                                                    6. Se genera Output (Dashboard + PDF + Mails)
+                                                     6. Se genera Output (Dashboard + PDF + Mails)
 
-                                                    📌 Fase 1: Arquitectura Base y Modelado de Datos
+                                                     📌 Fase 1: Arquitectura Base y Modelado de Datos
 Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para la cola de pendientes y los esquemas de datos del sistema.
 
 [x] ~~1.1. Inicialización del Proyecto~~
@@ -50,15 +50,17 @@ Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para l
 🧩 Fase 2: Desarrollo de Módulos de Integración (Servicios Independientes)
 Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una de las plataformas externas.
 
-[ ] 2.1. Módulo Core de Lógica de Negocio (src/core/generator.py)
+[x] ~~2.1. Módulo Core de Lógica de Negocio (src/core/generator.py)~~
 
-[ ] Implementar la función de resolución de nombres de usuario y sanitización de caracteres especiales/acentos.
+[x] ~~Implementar la función de resolución de nombres de usuario y sanitización de caracteres especiales/acentos.~~
 
-[ ] Lógica de resolución de colisiones (alternativas fgomez, fabiogomez, fabiogomez1).
+[x] ~~Lógica de resolución de colisiones (alternativas fgomez, fabiogomez, fabiogomez1).~~
 
-[ ] Implementar la transformación lógica de Legajo para NeoTel (1339 -> 3339).
+[x] ~~Implementar la transformación lógica de Legajo para NeoTel.~~
 
-[ ] Nuevo: Función de generación de propuesta de credenciales (Username, Email, Passwords temporales) para previsualización.
+[x] ~~Función de generación de propuesta de credenciales (Username, Email, Passwords temporales, NeoTel, FortiClient, X-Lite alineados a la planilla operativa) para previsualización.~~
+
+[x] ~~Nuevo (Refactorización): Desacoplamiento de rutas en src/controllers/solicitudes_controller.py para limpiar main.py y estandarizar respuestas API.~~
 
 [ ] 2.2. Módulo Active Directory (src/services/ad_service.py)
 
@@ -68,7 +70,7 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Creación de usuario en la OU correspondiente según el perfil asignado.
 
-[ ] Asignación de contraseña temporal y flag de "Cambiar contraseña en el próximo inicio de sesión".
+[ ] Asignación de contraseña temporal predeterminada (T4nd3m**) y flag de "Cambiar contraseña en el próximo inicio de sesión".
 
 [ ] Vinculación a grupos de seguridad (GPO).
 
@@ -78,28 +80,28 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Verificación pre-ejecución: Consultar si la casilla corporativa ya existe en Workspace.
 
-[ ] Creación de la casilla corporativa (@tandemtech.com.ar), asignación de licencias y contraseña inicial.
+[ ] Creación de la casilla corporativa (@tandemtech.com.ar), asignación de licencias y contraseña inicial (T4nd3m**).
 
 [ ] 2.4. Módulo NeoTel (src/services/neotel_service.py)
 
-[ ] Telemarketer: Alta de usuario con legajo transformado (3339) y contraseña igual a DNI.
+[ ] Telemarketer: Alta de usuario con legajo transformado y contraseña igual a DNI.
 
 [ ] Extracción de QR: Capturar y almacenar la imagen en Base64/PNG del token 2FA devuelto por la API.
 
-[ ] Posición (Softphone): Alta de posición NombreApellido, contraseña fija Tandem123, selección de protocolo SIP y reescritura del parámetro de configuración reemplazando nat='no' por nat='yes'.
+[ ] Posición (Softphone / X-Lite): Alta de posición NombreApellido, contraseña fija Tandem123, selección de protocolo SIP y reescritura del parámetro nat='yes'.
 
 [ ] 2.5. Módulo FortiClient / FortiGate (src/services/fortinet_service.py)
 
 [ ] Automatización vía SSH/Paramiko o REST API en FortiGate.
 
-[ ] Creación de usuario local con contraseña igual a DNI, asignación del mail institucional para 2FA y adición al grupo de túnel VPN.
+[ ] Creación de usuario local NombreApellido con contraseña igual a DNI, asignación del mail institucional para 2FA y adición al grupo de túnel VPN.
 
 ⚙️ Fase 3: El Orquestador de Altas (src/core/orchestrator.py)
 Objetivo: Crear el motor principal que ejecuta las llamadas a todos los servicios en el orden correcto y gestiona los fallos.
 
-[ ] 3.1. Fase de Pre-Validación (Dry-Run / Preview)
+[x] ~~3.1. Fase de Pre-Validación (Dry-Run / Preview)~~
 
-[ ] Generar payload de vista previa antes de la ejecución real.
+[x] ~~Generar payload de vista previa antes de la ejecución real mediante /api/solicitudes/{id}/preview.~~
 
 [ ] 3.2. Flujo Secuencial de Ejecución Real
 
@@ -120,9 +122,9 @@ Objetivo: Generar la documentación para el empleado y disparar las notificacion
 
 [ ] Enviar correo al responsable en reporta_a y al empleado con el PDF adjunto.
 
-[ ] 4.3. Exportación a CSV (src/controllers/exports.py)
+[ ] 4.3. Exportación a CSV / Excel (src/controllers/exports.py)
 
-[ ] Descarga de reporte ordenado en formato .csv con las credenciales creadas.
+[ ] Descarga de reporte ordenado en formato .csv / .xlsx coincidente con el esquema de la planilla interna.
 
 💻 Fase 5: Desarrollo de la Interfaz Web (Frontend)
 Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
@@ -137,9 +139,9 @@ Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
 
 [x] ~~Dashboard básico y verificación de autenticación de rol SISTEMAS.~~
 
-[ ] Nuevo: Modal de Previsualización de Credenciales (muestra propuesta de Username, Passwords, Mail y permite edición manual previa).
+[x] ~~Modal de Previsualización de Credenciales (muestra propuesta de Mail Corp, Usuario AD, Usuario/Clave Fortinet, Usuario/Clave NeoTel y Dispositivo X-Lite).~~
 
-[ ] Botón interactivo 🚀 Confirmar y Ejecutar Alta con barra de progreso en vivo.
+[ ] Botón interactivo 🚀 Confirmar y Ejecutar Alta con feedback visual / barra de progreso en vivo.
 
 [ ] Vista previa final de credenciales creadas + Botones para copiar texto individualmente, descargar PDF y exportar CSV.
 
@@ -164,6 +166,7 @@ app_rrhh/
 │       └── sistemas_dashboard.html
 ├── src/
 │   ├── controllers/
+│   │   └── solicitudes_controller.py
 │   ├── core/
 │   │   ├── generator.py
 │   │   └── orchestrator.py
