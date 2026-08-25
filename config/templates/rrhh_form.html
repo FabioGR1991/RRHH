@@ -11,7 +11,7 @@
     <style>
         body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .card-header-custom { background: #0066ff; color: white; font-weight: 600; }
-        
+
         /* Zona Drag & Drop */
         .drop-zone {
             border: 2px dashed #0066ff;
@@ -41,7 +41,7 @@
     </nav>
 
     <div class="container-fluid px-4 my-4">
-        
+
         <!-- Pestañas para elegir modo de carga -->
         <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -60,7 +60,7 @@
             <!-- Columna Izquierda: Formularios -->
             <div class="col-lg-5 col-12">
                 <div class="tab-content" id="pills-tabContent">
-                    
+
                     <!-- TAB 1: FORMULARIO INDIVIDUAL -->
                     <div class="tab-pane fade show active" id="panel-individual" role="tabpanel">
                         <div class="card shadow-sm border-0 rounded-3">
@@ -199,9 +199,29 @@
         </div>
     </div>
 
+    <!-- MODAL DE DETALLE DE CREDENCIALES APROBADAS -->
+    <div class="modal fade" id="modalVerCredencialesRRHH" tabindex="-1" aria-labelledby="modalVerCredencialesLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalVerCredencialesLabel"><i class="bi bi-folder-check me-2"></i>Información de Credenciales Procesadas</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Detalle de cuentas y accesos generados por el equipo de IT:</p>
+                    <div id="detalleCredencialesContent" class="row g-3">
+                        <div class="text-center py-4 text-muted">Cargando datos...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Validación estricta de perfiles permitidos
         const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
 
         const checkboxFN = document.getElementById('esFueraNomina');
@@ -212,7 +232,6 @@
         let perfilPrevio = '';
         let datosExcelProcesados = [];
 
-        // Lógica de deshabilitado y autocompletado para Fuera de Nómina
         checkboxFN.addEventListener('change', async function() {
             if (this.checked) {
                 legajoPrevio = inputLegajo.value;
@@ -238,7 +257,6 @@
             }
         });
 
-        // Cargar solicitudes en el panel
         async function cargarMisSolicitudes() {
             try {
                 const response = await fetch('/api/solicitudes');
@@ -252,8 +270,29 @@
                 }
 
                 data.forEach(sol => {
-                    const badgeClass = sol.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success';
-                    const estadoTexto = sol.estado === 'PENDIENTE' ? '<i class="bi bi-hourglass-split me-1"></i> Pendiente IT' : '<i class="bi bi-check-circle me-1"></i> Aprobado';
+                    const esAprobado = sol.estado === 'PROCESADO' || sol.estado === 'APROBADO';
+                    
+                    // Renderizado condicional del Badge y del Botón Carpeta
+                    let estadoHtml = '';
+                    if (esAprobado) {
+                        estadoHtml = `
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success py-2 px-2">
+                                    <i class="bi bi-check-circle me-1"></i> Aprobado
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2" onclick="verDetalleAprobado(${sol.id})" title="Ver credenciales procesadas">
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        estadoHtml = `
+                            <span class="badge bg-warning text-dark py-2 px-2">
+                                <i class="bi bi-hourglass-split me-1"></i> Pendiente IT
+                            </span>
+                        `;
+                    }
+
                     const fnBadge = sol.es_fuera_de_nomina ? '<span class="badge bg-warning text-dark me-1">FN</span>' : '';
 
                     tbody.innerHTML += `
@@ -268,8 +307,8 @@
                                 <div class="small text-muted"><i class="bi bi-telephone me-1"></i>${sol.telefono || 'N/A'}</div>
                             </td>
                             <td><span class="small text-muted">${sol.reporta_a || 'N/A'}</span></td>
-                            <td><span class="badge bg-secondary">${sol.perfil_ad}</span></td>
-                            <td><span class="badge ${badgeClass}">${estadoTexto}</span></td>
+                            <td><span class="badge bg-secondary">${sol.perfil_ad || sol.perfil}</span></td>
+                            <td>${estadoHtml}</td>
                         </tr>
                     `;
                 });
@@ -278,7 +317,72 @@
             }
         }
 
-        // Envío Alta Individual
+        async function verDetalleAprobado(id) {
+            const container = document.getElementById('detalleCredencialesContent');
+            container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando credenciales...</div>`;
+
+            const modal = new bootstrap.Modal(document.getElementById('modalVerCredencialesRRHH'));
+            modal.show();
+
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/preview`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.es_fuera_de_nomina) {
+                        container.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-info py-2 small mb-2">
+                                    <i class="bi bi-info-circle-fill me-1"></i> <strong>Empleado Fuera de Nómina:</strong> No posee cuentas de Active Directory, Gmail corporativo ni VPN.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || '-'}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Posición X-Lite</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || '-'}</span></div>
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_ad || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail || '-'}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.email || '-'}" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet || '-'}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || '-'}</span></div>
+                            </div>
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || '-'}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || '-'}</span></div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger">Error: ${data.detail || 'No se pudieron recuperar las credenciales'}</div>`;
+                }
+            } catch (err) {
+                container.innerHTML = `<div class="alert alert-danger">Error de conexión con el servidor.</div>`;
+            }
+        }
+
         document.getElementById('altaForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const alertMsg = document.getElementById('alertMsg');
@@ -324,7 +428,6 @@
             }
         });
 
-        // --- MANEJO DE DRAG & DROP Y EXCEL ---
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
@@ -389,7 +492,7 @@
                 document.getElementById('previewMasivo').classList.remove('d-none');
                 document.getElementById('alertMsgMasivo').classList.add('d-none');
             };
-            reader.readAsArrayBuffer(archivo);
+            reader.readAsBuffer ? reader.readAsBuffer(archivo) : reader.readAsArrayBuffer(archivo);
         }
 
         function limpiarExcel() {
@@ -408,7 +511,7 @@
 
             for (let i = 0; i < datosExcelProcesados.length; i++) {
                 const item = datosExcelProcesados[i];
-                const numFila = i + 2; // +2 contemplando encabezados de la fila 1 en Excel
+                const numFila = i + 2;
 
                 try {
                     const res = await fetch('/api/solicitudes', {
@@ -457,7 +560,7 @@
                         <div class="fw-bold small text-danger mb-1">Detalle de inconvenientes:</div>
                         <ul class="list-group list-group-flush border rounded bg-white small" style="max-height: 180px; overflow-y: auto;">
                 `;
-                
+
                 errores.forEach(err => {
                     html += `<li class="list-group-item list-group-item-danger py-1 px-2 text-wrap small"><sup>•</sup> ${err}</li>`;
                 });
@@ -478,7 +581,7 @@
 
         function descargarPlantilla() {
             const wb = XLSX.utils.book_new();
-            
+
             const wsData = [
                 ["Nombre", "Apellido", "DNI", "Legajo", "Telefono", "Reporta A", "Perfil"],
                 ["Juan", "Pérez", "38999888", "1234", "1155443322", "Carlos Gómez", "Operador"],
@@ -486,13 +589,12 @@
                 ["Pedro", "Sosa", "35444555", "1236", "1122334455", "Roberto Diaz", "Supervisión"],
                 ["Laura", "Gimenez", "30999111", "1237", "1133221100", "Directorio", "Gerencia"]
             ];
-            
+
             const ws = XLSX.utils.aoa_to_sheet(wsData);
             XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Altas");
             XLSX.writeFile(wb, "Plantilla_Altas_RRHH.xlsx");
         }
 
-        // Inicializar
         cargarMisSolicitudes();
         setInterval(cargarMisSolicitudes, 5000);
     </script>

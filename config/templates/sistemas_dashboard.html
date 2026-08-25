@@ -7,6 +7,8 @@ Maneja:
  - Botón de Re-verificación en vivo para resolver colisiones de nombres/cuentas en batches.
  - Adaptación condicional del Modal para Empleados "Fuera de Nómina" (sin AD/Mail/VPN).
  - Ejecución de la aprobación final y aprovisionamiento de cuentas en los servicios MOCK/REAL.
+ - Despliegue de Output con Credenciales creadas y opción de copiado al portapapeles.
+ - Reapertura del Modal de Credenciales para registros ya procesados.
 =================================================================== -->
 <!DOCTYPE html>
 <html lang="es">
@@ -88,7 +90,6 @@ Maneja:
                     <input type="hidden" id="solicitudIdActual">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
                     
-                    <!-- Botón para volver a consultar disponibilidad ante colisiones -->
                     <button type="button" id="btnRecalcular" onclick="recalcularPreview()" class="btn btn-outline-primary btn-sm">
                         <i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad
                     </button>
@@ -101,10 +102,39 @@ Maneja:
         </div>
     </div>
 
+    <!-- MODAL DE OUTPUT DE CREDENCIALES PROCESADAS -->
+    <div class="modal fade" id="modalOutputCredenciales" tabindex="-1" aria-labelledby="modalOutputLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalOutputLabel"><i class="bi bi-check-circle-fill me-2"></i>Alta Procesada Exitosamente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2">Las cuentas han sido aprovisionadas. Copie el resumen de credenciales generado:</p>
+                    <div class="mb-3">
+                        <textarea id="outputTextoFormateado" readonly class="form-control font-monospace text-dark bg-light" rows="10" style="font-size: 0.85rem; resize: none;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" onclick="copiarOutputTexto()" class="btn btn-primary btn-sm">
+                        <i class="bi bi-clipboard-check me-1"></i> Copiar Texto Resumen
+                    </button>
+                    <button type="button" class="btn btn-dark btn-sm" data-bs-dismiss="modal" onclick="cargarSolicitudes()">
+                        Entendido / Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // Objeto global para almacenar la previsualización activa
+        let previewActualCache = null;
+
         async function cargarSolicitudes() {
             try {
                 const response = await fetch('/api/solicitudes');
@@ -137,7 +167,7 @@ Maneja:
                             <td class="text-end pe-4">
                                 ${sol.estado === 'PENDIENTE' 
                                     ? `<button onclick="abrirPreview(${sol.id})" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-search me-1"></i> Previsualizar</button>` 
-                                    : `<span class="text-muted small"><i class="bi bi-check-all"></i> Procesado</span>`}
+                                    : `<button onclick="verCredenciales(${sol.id})" class="btn btn-sm btn-outline-success"><i class="bi bi-key-fill me-1"></i> Ver Credenciales</button>`}
                             </td>
                         </tr>
                     `;
@@ -162,9 +192,9 @@ Maneja:
                 const data = await response.json();
 
                 if (response.ok) {
+                    previewActualCache = data; // Almacenamos respuesta completa
                     const esFueraDeNomina = data.es_fuera_de_nomina;
 
-                    // Si el perfil es Fuera de Nómina, ocultamos AD, Mail y VPN Fortinet
                     if (esFueraDeNomina) {
                         container.innerHTML = `
                             <div class="col-12">
@@ -188,7 +218,6 @@ Maneja:
                             </div>
                         `;
                     } else {
-                        // Vista estándar para empleados regulares
                         container.innerHTML = `
                             <!-- AD / MAIL -->
                             <div class="col-md-6">
@@ -256,18 +285,15 @@ Maneja:
                 });
 
                 const data = await response.json();
-                const alertBox = document.getElementById('alertBox');
 
-                // Cerrar modal
+                // Cerrar modal de preview
                 const modalEl = document.getElementById('modalPreview');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (modalInstance) modalInstance.hide();
 
                 if (response.ok) {
-                    alertBox.textContent = `Solicitud #${id} aprobada y aprovisionada correctamente en los sistemas.`;
-                    alertBox.classList.remove('d-none');
-                    setTimeout(() => alertBox.classList.add('d-none'), 5000);
-                    cargarSolicitudes();
+                    // Desplegar Modal de Output con credenciales procesadas
+                    mostrarModalOutput(previewActualCache);
                 } else {
                     alert('Error al procesar: ' + (data.detail || 'Desconocido'));
                     cargarSolicitudes();
@@ -279,6 +305,65 @@ Maneja:
                 btn.disabled = false;
                 btn.innerHTML = `<i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta`;
             }
+        }
+
+        async function verCredenciales(id) {
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/preview`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarModalOutput(data);
+                } else {
+                    alert('No se pudieron recuperar las credenciales: ' + (data.detail || 'Error desconocido'));
+                }
+            } catch (err) {
+                console.error('Error recuperando credenciales:', err);
+                alert('Error al conectar con el servidor.');
+            }
+        }
+
+        function mostrarModalOutput(creds) {
+            if (!creds) return;
+            
+            let textoResumen = `=== ALTA DE USUARIO CONFIRMADA ===\n\n`;
+
+            if (creds.es_fuera_de_nomina) {
+                textoResumen += `[ TIPO: EMPLEADO FUERA DE NÓMINA ]\n`;
+                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
+                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
+                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
+                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
+                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
+            } else {
+                textoResumen += `[ Active Directory / Mail ]\n`;
+                textoResumen += `• Usuario AD: ${creds.usuario_ad || '-'}\n`;
+                textoResumen += `• Mail Corporativo: ${creds.email || '-'}\n`;
+                textoResumen += `• Clave Predeterminada: ${creds.clave_ad_mail || '-'}\n\n`;
+                
+                textoResumen += `[ Fortinet VPN ]\n`;
+                textoResumen += `• Usuario Fortinet: ${creds.usuario_fortinet || '-'}\n`;
+                textoResumen += `• Clave (DNI): ${creds.clave_fortinet || '-'}\n\n`;
+
+                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
+                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
+                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
+                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
+                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
+            }
+            textoResumen += `=================================`;
+
+            document.getElementById('outputTextoFormateado').value = textoResumen;
+            
+            const modalOutput = new bootstrap.Modal(document.getElementById('modalOutputCredenciales'));
+            modalOutput.show();
+        }
+
+        function copiarOutputTexto() {
+            const copyText = document.getElementById('outputTextoFormateado');
+            copyText.select();
+            document.execCommand('copy');
+            alert('¡Credenciales copiadas al portapapeles!');
         }
 
         // Carga inicial y auto-refresco cada 10s
