@@ -5,6 +5,9 @@ DESCRIPCIÓN: Controlador de Endpoints / Rutas API para las solicitudes.
 ===================================================================
 """
 
+import asyncio
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Response
+
 import csv
 import io
 import os
@@ -330,3 +333,85 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
             "pdf_generado": bool(pdf_path)
         }
     }
+
+# ==========================================
+# ENDPOINT: EXPORTAR A EXCEL MASIVO
+# ==========================================
+@router.post("/exportar-excel")
+async def exportar_solicitudes_excel(
+    ids: List[int],
+    db: Session = Depends(get_db)
+):
+    """
+    Recibe una lista de IDs de solicitudes procesadas/aprobadas y genera 
+    un archivo Excel (.xlsx) dinámico con la estructura operativa de credenciales.
+    """
+    if not ids:
+        raise HTTPException(status_code=400, detail="No se seleccionó ninguna solicitud para exportar.")
+
+    # Consultar las solicitudes solicitadas
+    solicitudes = db.query(SolicitudAlta).filter(
+        SolicitudAlta.id.in_(ids)
+    ).all()
+
+    if not solicitudes:
+        raise HTTPException(status_code=404, detail="No se encontraron las solicitudes especificada.")
+
+    check_services = {
+        "ad": ad_service,
+        "google": gadmin_service,
+        "neotel": neo_service,
+        "fortinet": fortinet_service
+    }
+
+    filas = []
+
+    for s in solicitudes:
+        # Re-generar / resolver de forma determinística la propuesta de credenciales para la exportación
+        preview_full = await generar_preview_credenciales(
+            nombre=s.nombre,
+            apellido=s.apellido,
+            dni=s.dni,
+            legajo=s.legajo,
+            perfil=s.perfil_ad,
+            reporta_a=s.reporta_a,
+            check_services=check_services
+        )
+        creds = preview_full["propuesta_credenciales"]
+
+        # Estructura idéntica al Excel operativo de IT/RRHH
+        filas.append({
+            "Mail": creds["google_workspace"]["email"],
+            "Clave Mail": creds["google_workspace"]["password_temp"],
+            "Nro. Cel": "N/A",  # O s.telefono si se agrega en el futuro
+            "Usuario AD": creds["active_directory"]["username"],
+            "Clave AD": creds["active_directory"]["password_temp"],
+            "Usuario Fortinet (VPN 100 F)": creds["forticlient"]["username"],
+            "Clave Fortinet (DNI)": creds["forticlient"]["password_temp"],
+            "USUARIO NEO": creds["neotel"]["telemarketer_user"],
+            "CLAVE 9": f"9{creds['neotel']['telemarketer_user']}",
+            "NOMBRE": s.nombre.title(),
+            "APELLIDO": s.apellido.title(),
+            "Dispositivo posición (X-Lite)": creds["neotel"]["posicion_user"],
+            "CLAVE": creds["neotel"]["posicion_pass"],
+            "Superior": s.reporta_a
+        })
+
+    # Generación del DataFrame de Pandas
+    df = pd.DataFrame(filas)
+
+    # Convertir a buffer binario Excel en memoria
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Credenciales Altas')
+    output.seek(0)
+
+    headers = {
+        'Content-Disposition': 'attachment; filename="Credenciales_Altas_RRHH.xlsx"'
+    }
+
+    return Response(
+        content=output.getvalue(),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers=headers
+    )

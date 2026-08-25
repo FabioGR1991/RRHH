@@ -1,12 +1,8 @@
-# 🚀 ROADMAP: Plataforma de Aprovisionamiento y Automatización de Altas (RRHH - IT)
+🚀 ROADMAP: Plataforma de Aprovisionamiento y Automatización de Altas (RRHH - IT)
+Plataforma web para la automatización y gestión del ciclo de vida de usuarios (Onboarding / IAM), implementando un modelo de Aprobación de Dos Pasos (Dual Authorization) entre Recursos Humanos (Solicitud) e IT (Previsualización, Aprobación y Ejecución).
 
-Plataforma web para la automatización y gestión del ciclo de vida de usuarios (Onboarding / IAM), implementando un modelo de **Aprobación de Dos Pasos (Dual Authorization)** entre **Recursos Humanos** (Solicitud) e **IT** (Previsualización, Aprobación y Ejecución).
+📋 Resumen del Flujo Operativo
 
----
-
-## 📋 Resumen del Flujo Operativo
-
-```text
 [ RRHH ]                                                [ EQUIPO DE IT ]
    │                                                           │
    ▼                                                           ▼
@@ -43,7 +39,7 @@ Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para l
 
 [x] ~~Configurar la base de datos (SQLite para desarrollo / PostgreSQL para producción).~~
 
-[x] ~~Diseñar el modelo SolicitudAlta con los estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO.~~
+[x] ~~Diseñar el modelo SolicitudAlta con los estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO / PROCESADO / APROBADO.~~
 
 [x] ~~Incorporación del campo reporta_a (Responsable/Jefe directo) y flag es_fuera_de_nomina en modelo y esquemas Pydantic.~~
 
@@ -68,7 +64,7 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [x] ~~Endpoint /api/solicitudes/siguiente-legajo-fn para autogeneración incremental de legajos para personal Fuera de Nómina (Rango 7000+).~~
 
-[ ] 2.2. Módulo Active Directory (src/services/ad_service.py)
+[ ] 2.2. Módulo Active Directory (src/services/ad_service)
 
 [ ] Conexión vía LDAP/WinRM/PowerShell.
 
@@ -80,7 +76,7 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Vinculación a grupos de seguridad (GPO).
 
-[ ] 2.3. Módulo Google Admin / Gmail (src/services/gadmin_service.py)
+[ ] 2.3. Módulo Google Admin / Gmail (src/services/gadmin_service)
 
 [ ] Integración con la API Google Workspace Admin SDK mediante Service Account.
 
@@ -88,7 +84,7 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Creación de la casilla corporativa (@tandemtech.com.ar), asignación de licencias y contraseña inicial (T4nd3m**).
 
-[ ] 2.4. Módulo NeoTel (src/services/neotel_service.py)
+[ ] 2.4. Módulo NeoTel (src/services/neo_service)
 
 [ ] Telemarketer: Alta de usuario con legajo transformado y contraseña igual a DNI.
 
@@ -96,7 +92,7 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Posición (Softphone / X-Lite): Alta de posición NombreApellido, contraseña fija Tandem123, selección de protocolo SIP y reescritura del parámetro nat='yes'.
 
-[ ] 2.5. Módulo FortiClient / FortiGate (src/services/fortinet_service.py)
+[ ] 2.5. Módulo FortiClient / FortiGate (src/services/fortinet_service)
 
 [ ] Automatización vía SSH/Paramiko o REST API en FortiGate.
 
@@ -124,7 +120,7 @@ Objetivo: Generar la documentación para el empleado y disparar las notificacion
 
 [ ] Renderizar dinámicamente credenciales confirmadas, guías de acceso y QR de NeoTel.
 
-[ ] 4.2. Módulo de Notificaciones por Email (src/services/mail_service.py)
+[ ] 4.2. Módulo de Notificaciones por Email (src/services/email_service.py)
 
 [ ] Enviar correo al responsable en reporta_a y al empleado con el PDF adjunto.
 
@@ -148,6 +144,8 @@ Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
 [x] ~~Feedback de errores granulares de carga masiva: tarjeta con scroll que lista número de fila Excel, nombre de postulante y motivo del fallo (ej. DNI/Legajo duplicado).~~
 
 [x] ~~Tabla de historial de solicitudes enviadas por RRHH y sincronización automática en tiempo real (polling cada 5s).~~
+
+[x] ~~Rediseño UX/UI de tabla RRHH: Separación de badge visual indicador del estado (Aprobado) respecto al botón de acción interactivo (icono de carpeta bi-folder2-open) para consultar el modal de credenciales procesadas.~~
 
 [ ] 5.2. Vista de IT (config/templates/sistemas_dashboard.html)
 
@@ -185,26 +183,25 @@ RRHH
 │   ├── controllers
 │   │   └── solicitudes_controller.py
 │   ├── core
-│   │   └── generator.py
+│   │   ├── generator.py
+│   │   └── orchestrator.py
 │   ├── models
 │   │   ├── solicitud.py
 │   │   └── usuario.py
 │   └── services
-│       ├── ad_service
+│       ├── ad_service/
 │       ├── email_service.py
-│       ├── fortinet_service
-│       ├── gadmin_service
-│       ├── neo_service
+│       ├── fortinet_service/
+│       ├── gadmin_service/
+│       ├── neo_service/
 │       ├── pdf_service.py
-│       └── xlite_service
+│       └── xlite_service/
 └── storage
-    ├── pdfs
-    └── qrs
-(venv) 
+    ├── pdfs/
+    └── qrs/
 
 
-📌 Guía de Modos de Ejecución (Entornos de Red / Configuración)
-
+    ⚙️ Guía de Modos de Ejecución (Entornos de Red / Configuración)
 Modo Dummy (Desarrollo / Testing local):
 
 Carga servicios/APIs simulados para pruebas locales sin impacto en el entorno productivo.
