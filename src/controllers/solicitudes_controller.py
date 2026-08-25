@@ -20,11 +20,12 @@ from config.database import get_db
 from src.models.solicitud import SolicitudAlta
 from src.core.generator import generar_preview_credenciales
 
-# Importación de servicios de aprovisionamiento MOCK/REAL
-from src.services.ad_service import crear_usuario_ad
-from src.services.gadmin_service import crear_casilla_google
-from src.services.fortinet_service import crear_usuario_fortinet
-from src.services.neo_service import crear_usuario_neotel
+# Importación limpia de servicios de aprovisionamiento (Instancias y Wrappers)
+from src.services.ad_service import ad_service, crear_usuario_ad
+from src.services.gadmin_service import gadmin_service, crear_casilla_google
+from src.services.fortinet_service import fortinet_service, crear_usuario_fortinet
+from src.services.neo_service import neo_service, crear_usuario_neotel
+from src.services.xlite_service import xlite_service
 
 # Importación de servicios de PDF y Notificaciones
 from src.services.pdf_service import generar_pdf_credenciales
@@ -199,11 +200,19 @@ async def cargar_solicitudes_masiva(file: UploadFile = File(...), db: Session = 
 
 @router.get("/{solicitud_id}/preview")
 async def obtener_preview_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
-    """Genera la previsualización de credenciales para IT consumiendo generator.py."""
+    """Genera la previsualización de credenciales para IT consumiendo generator.py con verificación de servicios."""
     solicitud = db.query(SolicitudAlta).filter(SolicitudAlta.id == solicitud_id).first()
 
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
+
+    # Inyección de servicios para verificar colisiones reales/mock
+    check_services = {
+        "ad": ad_service,
+        "google": gadmin_service,
+        "neotel": neo_service,
+        "fortinet": fortinet_service
+    }
 
     preview_full = await generar_preview_credenciales(
         nombre=solicitud.nombre,
@@ -211,7 +220,8 @@ async def obtener_preview_solicitud(solicitud_id: int, db: Session = Depends(get
         dni=solicitud.dni,
         legajo=solicitud.legajo,
         perfil=solicitud.perfil_ad,
-        reporta_a=solicitud.reporta_a
+        reporta_a=solicitud.reporta_a,
+        check_services=check_services
     )
 
     propuesta = preview_full["propuesta_credenciales"]
@@ -245,21 +255,33 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="La solicitud ya fue procesada previamente")
 
     # 1. Generar credenciales definitivas
+    check_services = {
+        "ad": ad_service,
+        "google": gadmin_service,
+        "neotel": neo_service,
+        "fortinet": fortinet_service
+    }
+
     preview_full = await generar_preview_credenciales(
         nombre=solicitud.nombre,
         apellido=solicitud.apellido,
         dni=solicitud.dni,
         legajo=solicitud.legajo,
         perfil=solicitud.perfil_ad,
-        reporta_a=solicitud.reporta_a
+        reporta_a=solicitud.reporta_a,
+        check_services=check_services
     )
     creds = preview_full["propuesta_credenciales"]
 
     # 2. Ejecutar aprovisionamiento en los servicios integrados
     try:
-        await crear_usuario_ad(creds["active_directory"])
-        await crear_casilla_google(creds["google_workspace"])
-        await crear_usuario_fortinet(creds["forticlient"])
+        # Si no es fuera de nómina aprovisionamos AD, Google y Fortinet
+        if not solicitud.es_fuera_de_nomina:
+            await crear_usuario_ad(creds["active_directory"])
+            await crear_casilla_google(creds["google_workspace"])
+            await crear_usuario_fortinet(creds["forticlient"])
+            
+        # Neotel aplica tanto a rol normal como fuera de nómina
         await crear_usuario_neotel(creds["neotel"])
     except Exception as e:
         logger.error(f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}: {e}")

@@ -162,8 +162,7 @@ Maneja:
                 const data = await response.json();
 
                 if (response.ok) {
-                    const creds = data.propuesta_credenciales || {};
-                    const esFueraDeNomina = data.es_fuera_de_nomina || (data.datos_personales && data.datos_personales.perfil === 'Fuera de Nómina');
+                    const esFueraDeNomina = data.es_fuera_de_nomina;
 
                     // Si el perfil es Fuera de Nómina, ocultamos AD, Mail y VPN Fortinet
                     if (esFueraDeNomina) {
@@ -177,15 +176,15 @@ Maneja:
                             <!-- NEO -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Usuario NEO</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.neotel ? creds.neotel.telemarketer_user : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${creds.neotel ? creds.neotel.telemarketer_pass : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
                             </div>
 
                             <!-- X-LITE / POSICIÓN -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.neotel ? creds.neotel.posicion_user : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${creds.neotel ? creds.neotel.posicion_pass : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
                             </div>
                         `;
                     } else {
@@ -194,33 +193,33 @@ Maneja:
                             <!-- AD / MAIL -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.active_directory ? creds.active_directory.username : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${creds.active_directory ? creds.active_directory.password_temp : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_ad || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail || ''}</span></div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.google_workspace ? creds.google_workspace.email : ''}" readonly>
+                                <input type="text" class="form-control form-control-sm" value="${data.email || ''}" readonly>
                             </div>
 
                             <!-- FORTINET -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.forticlient ? creds.forticlient.username : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${creds.forticlient ? creds.forticlient.password_temp : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet || ''}</span></div>
                             </div>
 
                             <!-- NEO -->
                             <div class="col-md-6">
                                 <label class="form-label fw-bold small mb-1">Usuario NEO</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.neotel ? creds.neotel.telemarketer_user : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${creds.neotel ? creds.neotel.telemarketer_pass : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
                             </div>
 
                             <!-- X-LITE -->
                             <div class="col-md-12">
                                 <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
-                                <input type="text" class="form-control form-control-sm" value="${creds.neotel ? creds.neotel.posicion_user : ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${creds.neotel ? creds.neotel.posicion_pass : ''}</span></div>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
                             </div>
                         `;
                     }

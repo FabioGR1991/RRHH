@@ -14,3 +14,5 @@ google-auth-oauthlib>=1.1.0
 pandas>=2.2.2
 openpyxl>=3.1.5
 reportlab>=5.0.1
+
+LANZARELMODODUMMY >= uvicorn main:app --reload --reload-dir src
