@@ -16,3 +16,4 @@ openpyxl>=3.1.5
 reportlab>=5.0.1
 
 LANZARELMODODUMMY >= uvicorn main:app --reload --reload-dir src
+

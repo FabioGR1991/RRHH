@@ -201,3 +201,30 @@ RRHH
     ├── pdfs
     └── qrs
 (venv) 
+
+
+📌 Guía de Modos de Ejecución (Entornos de Red / Configuración)
+
+Modo Dummy (Desarrollo / Testing local):
+
+Carga servicios/APIs simulados para pruebas locales sin impacto en el entorno productivo.
+
+Comando: uvicorn main:app --reload --reload-dir src (o definiendo DUMMY=true / MODE=development en variables de entorno).
+
+Modo Real (Integración / Producción):
+
+Conecta con los servicios, base de datos y APIs reales del sistema.
+
+En desarrollo local con backend real:
+
+Linux/macOS: MODE=production uvicorn main:app --reload --reload-dir src
+
+Windows (PowerShell): $env:MODE="production"; uvicorn main:app --reload --reload-dir src
+
+Windows (CMD): set MODE=production && uvicorn main:app --reload --reload-dir src
+
+En servidor de Producción:
+
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 (sin --reload para óptimo rendimiento).
+
+Nota de Configuración: Las llamadas y comportamiento de la API se conmutan mediante variables definidas en .env (ej. DUMMY_MODE=false o APP_ENV=production).
