@@ -168,16 +168,24 @@
                 <div class="card shadow-sm border-0 rounded-3">
                     <div class="card-header bg-white p-3 d-flex justify-content-between align-items-center">
                         <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history me-2"></i>Mis Solicitudes Enviadas</h5>
-                        <button onclick="cargarMisSolicitudes()" class="btn btn-outline-secondary btn-sm">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button id="btnExportarSeleccionados" onclick="exportarSeleccionados()" class="btn btn-success btn-sm d-none">
+                                <i class="bi bi-file-earmark-excel me-1"></i> Exportar (<span id="cantSeleccionados">0</span>)
+                            </button>
+                            <button onclick="cargarMisSolicitudes()" class="btn btn-outline-secondary btn-sm" title="Actualizar lista">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
                                     <tr>
-                                        <th class="ps-3">#</th>
+                                        <th class="ps-3" style="width: 40px;">
+                                            <input class="form-check-input" type="checkbox" id="checkAll" onchange="toggleSelectAll(this)">
+                                        </th>
+                                        <th>#</th>
                                         <th>Empleado</th>
                                         <th>Legajo / Tel.</th>
                                         <th>Reporta a</th>
@@ -187,7 +195,7 @@
                                 </thead>
                                 <tbody id="tablaMisSolicitudes">
                                     <tr>
-                                        <td colspan="6" class="text-center py-4 text-muted">Cargando historial...</td>
+                                        <td colspan="7" class="text-center py-4 text-muted">Cargando historial...</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -232,6 +240,10 @@
         let perfilPrevio = '';
         let datosExcelProcesados = [];
 
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarMisSolicitudes();
+        });
+
         checkboxFN.addEventListener('change', async function() {
             if (this.checked) {
                 legajoPrevio = inputLegajo.value;
@@ -259,20 +271,24 @@
 
         async function cargarMisSolicitudes() {
             try {
+                // Preservar elementos seleccionados antes de recargar
+                const prevSeleccionados = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => cb.value);
+
                 const response = await fetch('/api/solicitudes');
                 const data = await response.json();
                 const tbody = document.getElementById('tablaMisSolicitudes');
                 tbody.innerHTML = '';
 
                 if (data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No has generado solicitudes todavía.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No has generado solicitudes todavía.</td></tr>`;
+                    actualizarSeleccion();
                     return;
                 }
 
                 data.forEach(sol => {
                     const esAprobado = sol.estado === 'PROCESADO' || sol.estado === 'APROBADO';
+                    const isChecked = prevSeleccionados.includes(String(sol.id)) ? 'checked' : '';
                     
-                    // Renderizado condicional del Badge y del Botón Carpeta
                     let estadoHtml = '';
                     if (esAprobado) {
                         estadoHtml = `
@@ -297,7 +313,10 @@
 
                     tbody.innerHTML += `
                         <tr>
-                            <td class="ps-3 fw-bold text-secondary">#${sol.id}</td>
+                            <td class="ps-3">
+                                <input class="form-check-input item-check" type="checkbox" value="${sol.id}" ${isChecked} onchange="actualizarSeleccion()">
+                            </td>
+                            <td class="fw-bold text-secondary">#${sol.id}</td>
                             <td>
                                 <div class="fw-bold">${sol.nombre} ${sol.apellido}</div>
                                 <div class="small text-muted">DNI: ${sol.dni}</div>
@@ -312,6 +331,8 @@
                         </tr>
                     `;
                 });
+
+                actualizarSeleccion();
             } catch (err) {
                 console.error('Error al cargar historial:', err);
             }
@@ -595,7 +616,61 @@
             XLSX.writeFile(wb, "Plantilla_Altas_RRHH.xlsx");
         }
 
-        cargarMisSolicitudes();
+        /* --- FUNCIONES DE SELECCIÓN Y EXPORTACIÓN --- */
+        function toggleSelectAll(master) {
+            const checkboxes = document.querySelectorAll('.item-check');
+            checkboxes.forEach(cb => cb.checked = master.checked);
+            actualizarSeleccion();
+        }
+
+        function actualizarSeleccion() {
+            const checkboxes = document.querySelectorAll('.item-check');
+            const seleccionados = document.querySelectorAll('.item-check:checked');
+            const btnExportar = document.getElementById('btnExportarSeleccionados');
+            const cantLabel = document.getElementById('cantSeleccionados');
+            const checkAll = document.getElementById('checkAll');
+
+            cantLabel.textContent = seleccionados.length;
+            
+            if (seleccionados.length > 0) {
+                btnExportar.classList.remove('d-none');
+            } else {
+                btnExportar.classList.add('d-none');
+            }
+
+            if (checkAll && checkboxes.length > 0) {
+                checkAll.checked = checkboxes.length === seleccionados.length;
+            }
+        }
+
+        async function exportarSeleccionados() {
+            const seleccionados = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => parseInt(cb.value));
+
+            if (seleccionados.length === 0) return;
+
+            try {
+                const response = await fetch('/api/solicitudes/exportar-excel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: seleccionados })
+                });
+
+                if (!response.ok) throw new Error('Error al generar la planilla Excel.');
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Reporte_Solicitudes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('No se pudo descargar el archivo Excel: ' + err.message);
+            }
+        }
+
         setInterval(cargarMisSolicitudes, 5000);
     </script>
 </body>
