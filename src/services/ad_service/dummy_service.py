@@ -5,7 +5,11 @@ logger = logging.getLogger(__name__)
 
 class DummyActiveDirectoryService:
     def __init__(self):
-        self.mock_data = {"jperez", "admin", "lsanchez", "soporte"}
+        # Quitamos "jperez" para que la sintaxis inicial+apellido quede libre en pruebas
+        self.mock_data = {"admin", "lsanchez", "soporte"}
+
+    async def existe_usuario(self, username: str) -> bool:
+        return username in self.mock_data
 
     async def crear_usuario(self, datos: Dict[str, Any]) -> Dict[str, Any]:
         identifier = datos.get("username") or datos.get("email") or datos.get("usuario") or "test_user"

@@ -170,33 +170,34 @@ Objetivo: Asegurar el entorno, validar credenciales y vincular con monitoreo SIE
 
 📂 Estructura de Directorios del Proyecto
 
-app_rrhh/
-├── config/
+RRHH
+├── ROADMAP.md
+├── config
 │   ├── database.py
 │   ├── settings.py
-│   └── templates/
+│   └── templates
 │       ├── login.html
 │       ├── rrhh_form.html
 │       └── sistemas_dashboard.html
-├── src/
-│   ├── controllers/
+├── main.py
+├── requirements.txt
+├── src
+│   ├── controllers
 │   │   └── solicitudes_controller.py
-│   ├── core/
-│   │   ├── generator.py
-│   │   └── orchestrator.py
-│   ├── models/
+│   ├── core
+│   │   └── generator.py
+│   ├── models
 │   │   ├── solicitud.py
 │   │   └── usuario.py
-│   └── services/
-│       ├── ad_service.py
-│       ├── fortinet_service.py
-│       ├── gadmin_service.py
-│       └── neotel_service.py
-├── storage/
-│   ├── pdfs/
-│   └── qrs/
-├── .env.example
-├── .gitignore
-├── requirements.txt
-├── ROADMAP.md
-└── main.py
+│   └── services
+│       ├── ad_service
+│       ├── email_service.py
+│       ├── fortinet_service
+│       ├── gadmin_service
+│       ├── neo_service
+│       ├── pdf_service.py
+│       └── xlite_service
+└── storage
+    ├── pdfs
+    └── qrs
+(venv) 

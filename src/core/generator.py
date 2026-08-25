@@ -201,10 +201,10 @@ async def generar_preview_credenciales(
                 "nat": "yes"
             },
             "forticlient": {
-                "username": username_elegido,
-                "password_temp": dni,
-                "email_2fa": email,
-                "grupo_vpn": "VPN_Usuarios_remotos"
-            }
+    "username": nombre_completo_posicion,  # Cambiado de username_elegido a NombreApellido (ej. FabioGomez)
+    "password_temp": dni,
+    "email_2fa": email,
+    "grupo_vpn": "VPN_Usuarios_remotos"
+}
         }
     }
