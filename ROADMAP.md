@@ -7,26 +7,26 @@ Plataforma web para la automatización y gestión del ciclo de vida de usuarios 
 ## 📋 Resumen del Flujo Operativo
 
 ```text
-[ RRHH ]                                         [ EQUIPO DE IT ]
-   │                                                    │
-   ▼                                                    ▼
-1. Completa Formulario                               3. Revisa Solicitudes Pendientes
-   (Nombre, Apellido, DNI, Legajo,                      │
-    Reporta a, Perfil)                                  ▼
-   │                                                 4. Click en "Previsualizar Credenciales"
-   ▼                                                    (Genera propuesta de User, Mail, Pass, Neo, Forti)
-2. Guarda Solicitud en estado "PENDIENTE"               │
-                                                        ├─► Opción A: Modificar/Ajustar propuesta
-                                                        └─► Opción B: Confirmar y Ejecutar
-                                                        │
-                                                        ▼
-                                                     5. Se dispara orchestrator.py
-                                                        (Crea AD, Gmail, NeoTel, FortiClient)
-                                                        │
-                                                        ▼
-                                                     6. Se genera Output (Dashboard + PDF + Mails)
+[ RRHH ]                                                [ EQUIPO DE IT ]
+   │                                                           │
+   ▼                                                           ▼
+1. Completa Formulario / Carga Masiva (Excel)           3. Revisa Solicitudes Pendientes
+   (Nombre, Apellido, DNI, Legajo,                             │
+    Reporta a, Perfil, Fuera de Nómina)                        ▼
+   │                                                    4. Click en "Previsualizar Credenciales"
+   ▼                                                       (Genera propuesta de User, Mail, Pass, Neo, Forti)
+2. Guarda Solicitud en estado "PENDIENTE"                      │
+                                                               ├─► Opción A: Modificar/Ajustar propuesta
+                                                               └─► Opción B: Confirmar y Ejecutar
+                                                               │
+                                                               ▼
+                                                            5. Se dispara orchestrator.py
+                                                               (Crea AD, Gmail, NeoTel, FortiClient)
+                                                               │
+                                                               ▼
+                                                            6. Se genera Output (Dashboard + PDF + Mails)
 
-                                                     📌 Fase 1: Arquitectura Base y Modelado de Datos
+                                                            📌 Fase 1: Arquitectura Base y Modelado de Datos
 Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para la cola de pendientes y los esquemas de datos del sistema.
 
 [x] ~~1.1. Inicialización del Proyecto~~
@@ -35,15 +35,19 @@ Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para l
 
 [x] ~~Crear la estructura modular de carpetas (/config, /src/controllers, /src/core, /src/services, /src/models).~~
 
-[x] ~~Definir el archivo .env.example con las variables de entorno necesarias (claves API, credenciales SSH/LDAP, servidor SMTP).~~
+[x] ~~Definir el archivo .env.example y gestión de entorno con las variables necesarias (claves API, credenciales SSH/LDAP, servidor SMTP).~~
+
+[x] ~~Configuración y estabilización de dependencias base (requirements.txt: FastAPI, Uvicorn, SQLAlchemy, Pandas, OpenPyXL, Python-Multipart).~~
 
 [x] ~~1.2. Base de Datos & Cola de Pendientes~~
 
 [x] ~~Configurar la base de datos (SQLite para desarrollo / PostgreSQL para producción).~~
 
-[x] ~~Diseñar el modelo SolicitudAlta con los siguientes estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO.~~
+[x] ~~Diseñar el modelo SolicitudAlta con los estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO.~~
 
-[x] ~~Modificación sobre la marcha: Incorporación del campo reporta_a (Responsable/Jefe directo) en el modelo y esquema Pydantic.~~
+[x] ~~Incorporación del campo reporta_a (Responsable/Jefe directo) y flag es_fuera_de_nomina en modelo y esquemas Pydantic.~~
+
+[x] ~~Validaciones y restricciones de unicidad a nivel base de datos (DNI y Legajo únicos).~~
 
 [x] ~~Implementar el sistema de Roles y Permisos (Rol RRHH vs. Rol IT / SISTEMAS con autenticación por Cookies/Sesión).~~
 
@@ -60,7 +64,9 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [x] ~~Función de generación de propuesta de credenciales (Username, Email, Passwords temporales, NeoTel, FortiClient, X-Lite alineados a la planilla operativa) para previsualización.~~
 
-[x] ~~Nuevo (Refactorización): Desacoplamiento de rutas en src/controllers/solicitudes_controller.py para limpiar main.py y estandarizar respuestas API.~~
+[x] ~~Desacoplamiento de rutas en src/controllers/solicitudes_controller.py para limpiar main.py y estandarizar respuestas API.~~
+
+[x] ~~Endpoint /api/solicitudes/siguiente-legajo-fn para autogeneración incremental de legajos para personal Fuera de Nómina (Rango 7000+).~~
 
 [ ] 2.2. Módulo Active Directory (src/services/ad_service.py)
 
@@ -131,9 +137,17 @@ Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
 
 [x] ~~5.1. Vista de RRHH (config/templates/rrhh_form.html)~~
 
-[x] ~~Formulario de solicitud (Nombre, Apellido, DNI, Legajo, Reporta a, Perfil).~~
+[x] ~~Formulario de solicitud individual (Nombre, Apellido, DNI, Legajo, Reporta a, Perfil, Fuera de Nómina).~~
 
-[x] ~~Tabla de historial de solicitudes enviadas y sincronización automática (polling cada 5s).~~
+[x] ~~Automatización de campo Legajo / Perfil al marcar el switch "Empleado Fuera de Nómina".~~
+
+[x] ~~Módulo de Carga Masiva desde archivo Excel (.xlsx, .xls) con interfaz Drag & Drop y botón de descarga de plantilla especificada.~~
+
+[x] ~~Parseo dinámico con filtrado y mapeo de perfiles permitidos (Operador, Administrativo, Supervisión, Gerencia).~~
+
+[x] ~~Feedback de errores granulares de carga masiva: tarjeta con scroll que lista número de fila Excel, nombre de postulante y motivo del fallo (ej. DNI/Legajo duplicado).~~
+
+[x] ~~Tabla de historial de solicitudes enviadas por RRHH y sincronización automática en tiempo real (polling cada 5s).~~
 
 [ ] 5.2. Vista de IT (config/templates/sistemas_dashboard.html)
 
@@ -174,6 +188,10 @@ app_rrhh/
 │   │   ├── solicitud.py
 │   │   └── usuario.py
 │   └── services/
+│       ├── ad_service.py
+│       ├── fortinet_service.py
+│       ├── gadmin_service.py
+│       └── neotel_service.py
 ├── storage/
 │   ├── pdfs/
 │   └── qrs/

@@ -1,11 +1,21 @@
+# ===================================================================
+# ARCHIVO: src/core/generator.py
+# DESCRIPCIÓN: Motor central de generación de usernames, lógica de 
+# sanitización y validación de credenciales contra los servicios IT.
+# ===================================================================
+
 import re
 import unicodedata
 import random
 import string
 from typing import Dict, List, Optional, Any
 
-# Dominio corporativo predeterminado
-DEFAULT_DOMAIN = "tandemtech.com.ar"
+# Importación de configuraciones y servicios globales
+from config.settings import DOMINIO_EMAIL
+from src.services.gadmin_service import gadmin_service
+from src.services.ad_service import ad_service
+from src.services.fortinet_service import fortinet_service
+from src.services.neo_service import neo_service
 
 
 def sanitizar_string(texto: str) -> str:
@@ -28,10 +38,10 @@ def sanitizar_string(texto: str) -> str:
     return limpio.lower()
 
 
-def generar_usernames_candidatos(nombre: str, apellido: str) -> list[str]:
+def generar_usernames_candidatos(nombre: str, apellido: str) -> List[str]:
     """
     Genera una lista ordenada de alternativas de username para evitar colisiones.
-    Ejemplo para Fabio Gomez:
+    Ejemplo para Fabio Gómez:
     1. fgomez (Inicial Nombre + Apellido)
     2. fabiogomez (Primer Nombre + Apellido)
     3. fabiogomez1 ... fabiogomez5 (Contador)
@@ -98,44 +108,31 @@ async def resolver_username_disponible(
     check_services: Optional[Dict[str, Any]] = None
 ) -> str:
     """
-    Itera sobre la lista de candidatos de username y consulta con los servicios 
-    (AD, Google, NeoTel, Fortinet) para encontrar el primero que esté 100% libre.
+    Itera sobre la lista de candidatos de username y consulta asíncronamente con los 
+    servicios (AD, Google, Neo, Fortinet) para encontrar el primero que esté 100% libre.
     
-    `check_services` es un diccionario opcional con las instancias de servicios.
-    Si no se pasan servicios (modo dev/mock), devuelve el primer candidato.
+    Si `check_services` no se envía, utiliza por defecto las instancias importadas de la app.
     """
     if not candidatos:
         return "usuario"
 
-    if not check_services:
-        return candidatos[0]
+    # Mapeo de servicios (uso de inyectados o fall-back a las instancias globales)
+    srv_ad = check_services.get('ad') if check_services and 'ad' in check_services else ad_service
+    srv_google = check_services.get('google') if check_services and 'google' in check_services else gadmin_service
+    srv_forti = check_services.get('fortinet') if check_services and 'fortinet' in check_services else fortinet_service
+    srv_neo = check_services.get('neo') if check_services and 'neo' in check_services else neo_service
 
     for username in candidatos:
-        colision_detectada = False
+        email_candidate = f"{username}@{DOMINIO_EMAIL}"
 
-        # 1. Chequear Active Directory
-        if 'ad' in check_services and hasattr(check_services['ad'], 'existe_usuario'):
-            if await check_services['ad'].existe_usuario(username):
-                colision_detectada = True
-
-        # 2. Chequear Google Workspace
-        if not colision_detectada and 'google' in check_services and hasattr(check_services['google'], 'existe_usuario'):
-            email_candidate = f"{username}@{DEFAULT_DOMAIN}"
-            if await check_services['google'].existe_usuario(email_candidate):
-                colision_detectada = True
-
-        # 3. Chequear NeoTel (Telemarketer)
-        if not colision_detectada and 'neotel' in check_services and hasattr(check_services['neotel'], 'existe_usuario'):
-            if await check_services['neotel'].existe_usuario(username):
-                colision_detectada = True
-
-        # 4. Chequear FortiGate VPN
-        if not colision_detectada and 'fortinet' in check_services and hasattr(check_services['fortinet'], 'existe_usuario'):
-            if await check_services['fortinet'].existe_usuario(username):
-                colision_detectada = True
+        # Consultas de disponibilidad unificadas y asíncronas
+        ad_existe = await srv_ad.verificar_usuario_existe(username)
+        google_existe = await srv_google.verificar_email_existe(email_candidate)
+        forti_existe = await srv_forti.verificar_usuario_existe(username)
+        neo_existe = await srv_neo.verificar_usuario_existe(username)
 
         # Si ningún sistema detectó colisión, este username es el libre
-        if not colision_detectada:
+        if not ad_existe and not google_existe and not forti_existe and not neo_existe:
             return username
 
     # Si todos los candidatos colisionaron, agregar sufijo numérico aleatorio
@@ -158,8 +155,12 @@ async def generar_preview_credenciales(
     candidatos = generar_usernames_candidatos(nombre, apellido)
     username_elegido = await resolver_username_disponible(candidatos, check_services)
 
-    email = f"{username_elegido}@{DEFAULT_DOMAIN}"
+    email = f"{username_elegido}@{DOMINIO_EMAIL}"
     legajo_neotel = transformar_legajo_neotel(legajo)
+    
+    # Regla de clave NeoTel: Un 9 precediendo al número de usuario (ej. 3238 -> 93238)
+    telemarketer_pass_neotel = f"9{legajo_neotel}" if legajo_neotel else ""
+
     pass_temp_ad = "T4nd3m**"
 
     # Formato NombreApellido para la posición de NeoTel (ej. FabioGomez)
@@ -190,7 +191,7 @@ async def generar_preview_credenciales(
             },
             "neotel": {
                 "telemarketer_user": legajo_neotel,
-                "telemarketer_pass": dni,
+                "telemarketer_pass": telemarketer_pass_neotel,
                 "posicion_user": nombre_completo_posicion,
                 "posicion_pass": "Tandem123",
                 "protocolo": "SIP",

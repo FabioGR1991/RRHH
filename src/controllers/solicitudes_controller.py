@@ -2,18 +2,13 @@
 ===================================================================
 ARCHIVO: src/controllers/solicitudes_controller.py
 DESCRIPCIÓN: Controlador de Endpoints / Rutas API para las solicitudes.
-Aquí residen los endpoints que consulta el Frontend para:
- - Obtener el siguiente legajo de Fuera de Nómina (Google Sheets).
- - Crear nuevas solicitudes desde RRHH (Individual y Masiva Excel).
- - Listar todas las solicitudes (RRHH e IT).
- - Previsualizar credenciales propuestas antes de ejecutar (IT).
- - Aprobar / Procesar la solicitud.
 ===================================================================
 """
 
 import csv
 import io
 import os
+import logging
 import requests
 import pandas as pd
 from typing import List, Optional
@@ -24,6 +19,18 @@ from pydantic import BaseModel
 from config.database import get_db
 from src.models.solicitud import SolicitudAlta
 from src.core.generator import generar_preview_credenciales
+
+# Importación de servicios de aprovisionamiento MOCK/REAL
+from src.services.ad_service import crear_usuario_ad
+from src.services.gadmin_service import crear_casilla_google
+from src.services.fortinet_service import crear_usuario_fortinet
+from src.services.neo_service import crear_usuario_neotel
+
+# Importación de servicios de PDF y Notificaciones
+from src.services.pdf_service import generar_pdf_credenciales
+from src.services.email_service import enviar_notificacion_alta
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/solicitudes", tags=["Solicitudes"])
 
@@ -74,7 +81,7 @@ def obtener_siguiente_usuario_fn() -> int:
         return max_usuario + 1
 
     except Exception as e:
-        print(f"[WARN] Error al consultar Google Sheet FN: {e}")
+        logger.warning(f"Error al consultar Google Sheet FN: {e}")
         return 7345
 
 
@@ -137,14 +144,13 @@ async def cargar_solicitudes_masiva(file: UploadFile = File(...), db: Session = 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error al procesar el archivo Excel: {str(e)}")
 
-    # Normalizar nombres de columnas a minúsculas y sin espacios laterales
     df.columns = [str(col).strip().lower() for col in df.columns]
 
     exitos = 0
     errores = []
 
     for idx, row in df.iterrows():
-        num_fila = idx + 2  # +2 por el índice 0 y la fila de encabezados en Excel
+        num_fila = idx + 2
         
         nombre = str(row.get('nombre', '')).strip() if pd.notna(row.get('nombre')) else ""
         apellido = str(row.get('apellido', '')).strip() if pd.notna(row.get('apellido')) else ""
@@ -153,12 +159,10 @@ async def cargar_solicitudes_masiva(file: UploadFile = File(...), db: Session = 
         perfil_ad = str(row.get('perfil_ad', row.get('perfil', ''))).strip() if pd.notna(row.get('perfil_ad', row.get('perfil'))) else ""
         reporta_a = str(row.get('reporta_a', '')).strip() if pd.notna(row.get('reporta_a')) else ""
         
-        # Validación de campos obligatorios
         if not nombre or not apellido or not dni or not legajo:
             errores.append(f"Fila {num_fila}: Datos incompletos (Nombre, Apellido, DNI y Legajo son obligatorios).")
             continue
 
-        # Validaciones contra Base de Datos
         existe_dni = db.query(SolicitudAlta).filter(SolicitudAlta.dni == dni).first()
         if existe_dni:
             errores.append(f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} ya está registrado.")
@@ -169,7 +173,6 @@ async def cargar_solicitudes_masiva(file: UploadFile = File(...), db: Session = 
             errores.append(f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} ya está registrado.")
             continue
 
-        # Creación del registro si supera las validaciones
         nueva_solicitud = SolicitudAlta(
             nombre=nombre,
             apellido=apellido,
@@ -228,8 +231,11 @@ async def obtener_preview_solicitud(solicitud_id: int, db: Session = Depends(get
 
 
 @router.post("/{solicitud_id}/aprobar")
-def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
-    """Aprueba la solicitud cambiando su estado a PROCESADO."""
+async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
+    """
+    Aprueba la solicitud, aprovisiona los servicios, genera la ficha PDF, 
+    envía la notificación por email al responsable y actualiza el estado a PROCESADO.
+    """
     solicitud = db.query(SolicitudAlta).filter(SolicitudAlta.id == solicitud_id).first()
 
     if not solicitud:
@@ -238,17 +244,67 @@ def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
     if solicitud.estado == "PROCESADO":
         raise HTTPException(status_code=400, detail="La solicitud ya fue procesada previamente")
 
+    # 1. Generar credenciales definitivas
+    preview_full = await generar_preview_credenciales(
+        nombre=solicitud.nombre,
+        apellido=solicitud.apellido,
+        dni=solicitud.dni,
+        legajo=solicitud.legajo,
+        perfil=solicitud.perfil_ad,
+        reporta_a=solicitud.reporta_a
+    )
+    creds = preview_full["propuesta_credenciales"]
+
+    # 2. Ejecutar aprovisionamiento en los servicios integrados
+    try:
+        await crear_usuario_ad(creds["active_directory"])
+        await crear_casilla_google(creds["google_workspace"])
+        await crear_usuario_fortinet(creds["forticlient"])
+        await crear_usuario_neotel(creds["neotel"])
+    except Exception as e:
+        logger.error(f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al aprovisionar cuentas: {str(e)}")
+
+    # 3. Generar archivo PDF con la ficha de credenciales
+    datos_solicitud_dict = {
+        "nombre": solicitud.nombre,
+        "apellido": solicitud.apellido,
+        "dni": solicitud.dni,
+        "legajo": solicitud.legajo,
+        "perfil_ad": solicitud.perfil_ad,
+        "reporta_a": solicitud.reporta_a,
+        "es_fuera_de_nomina": solicitud.es_fuera_de_nomina
+    }
+    
+    pdf_path = None
+    try:
+        pdf_path = generar_pdf_credenciales(datos_solicitud_dict, creds)
+        logger.info(f"PDF de alta generado correctamente en: {pdf_path}")
+    except Exception as e:
+        logger.error(f"Error al generar PDF para la solicitud #{solicitud_id}: {e}")
+
+    # 4. Enviar correo de notificación al responsable (reporta_a)
+    if pdf_path:
+        nombre_completo = f"{solicitud.nombre} {solicitud.apellido}"
+        await enviar_notificacion_alta(
+            destinatario_email=solicitud.reporta_a,
+            nombre_empleado=nombre_completo,
+            pdf_path=pdf_path
+        )
+
+    # 5. Actualizar estado en la base de datos
     solicitud.estado = "PROCESADO"
     db.commit()
     db.refresh(solicitud)
 
     return {
         "status": "success",
-        "message": f"Solicitud #{solicitud_id} aprobada exitosamente",
+        "message": f"Solicitud #{solicitud_id} aprobada, aprovisionada y notificada exitosamente",
         "data": {
             "id": solicitud.id,
             "empleado": f"{solicitud.nombre} {solicitud.apellido}",
             "reporta_a": solicitud.reporta_a,
-            "estado": solicitud.estado
+            "estado": solicitud.estado,
+            "pdf_generado": bool(pdf_path)
         }
     }

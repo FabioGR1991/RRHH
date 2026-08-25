@@ -1,15 +1,14 @@
-"""
-===================================================================
-ARCHIVO: src/services/gadmin_service.py
-DESCRIPCIÓN: Servicio para la integración con Google Workspace Admin SDK.
-Soporta verificación de existencia y creación de usuarios con
-modo de simulación (MOCK) y conexión real vía Service Account.
-===================================================================
-"""
+# ===================================================================
+# ARCHIVO: src/services/gadmin_service.py
+# DESCRIPCIÓN: Servicio para la integración con Google Workspace Admin SDK.
+# Soporta verificación de existencia y creación de usuarios con
+# modo de simulación (MOCK) y conexión real vía Service Account.
+# ===================================================================
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+from config.settings import SIMULATE_INTEGRATIONS, DOMINIO_EMAIL
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ except ImportError:
 
 class GoogleAdminService:
     def __init__(self):
-        self.domain = os.getenv("GOOGLE_DOMAIN", "tandemtech.com.ar")
+        self.domain = os.getenv("GOOGLE_DOMAIN", DOMINIO_EMAIL)
         self.admin_email = os.getenv("GOOGLE_ADMIN_EMAIL", f"admin@{self.domain}")
         self.credentials_file = os.getenv("GOOGLE_CREDENTIALS_FILE", "credentials.json")
         self.scopes = ['https://www.googleapis.com/auth/admin.directory.user']
@@ -38,14 +37,21 @@ class GoogleAdminService:
     def _inicializar_conexion(self):
         """
         Evalúa si existen las credenciales reales para Google Admin API.
-        Si faltan requerimientos, conmuta automáticamente a modo Mock.
+        Si SIMULATE_INTEGRATIONS es True o faltan requerimientos, conmuta a modo Mock.
         """
+        if SIMULATE_INTEGRATIONS:
+            logger.info("ℹ️ Flag SIMULATE_INTEGRATIONS activo. Google Admin operando en MODO MOCK.")
+            self.mock_mode = True
+            return
+
         if not GOOGLE_SDK_AVAILABLE:
             logger.info("ℹ️ SDK de Google no instalado. Operando en MODO SIMULACIÓN (Mock).")
+            self.mock_mode = True
             return
 
         if not os.path.exists(self.credentials_file):
             logger.info(f"ℹ️ Archivo '{self.credentials_file}' no encontrado. Operando en MODO SIMULACIÓN (Mock).")
+            self.mock_mode = True
             return
 
         try:
@@ -53,7 +59,6 @@ class GoogleAdminService:
                 self.credentials_file, 
                 scopes=self.scopes
             )
-            # Delegación de autoridad de dominio (Domain-Wide Delegation)
             delegated_creds = creds.with_subject(self.admin_email)
             self.service = build('admin', 'directory_v1', credentials=delegated_creds)
             self.mock_mode = False
@@ -67,14 +72,14 @@ class GoogleAdminService:
         Consulta a Google Workspace si la casilla corporativa ya existe.
         """
         if self.mock_mode:
-            # Simulación: Casillas de prueba conocidas
             emails_existentes_mock = [
                 f"admin@{self.domain}",
                 f"soporte@{self.domain}",
-                f"proig@{self.domain}"
+                f"proig@{self.domain}",
+                f"jperez@{self.domain}"
             ]
             existe = email.lower() in emails_existentes_mock
-            logger.info(f"[MOCK Google Admin] Verificando existencia de {email}: {'EXISTE' if existe else 'DISPONIBLE'}")
+            logger.info(f"[MOCK Google Admin] Verificando {email}: {'EXISTE' if existe else 'DISPONIBLE'}")
             return existe
 
         try:
@@ -138,5 +143,5 @@ class GoogleAdminService:
             }
 
 
-# Instancia global para ser utilizada en los orquestadores
+# Instancia global exportada
 gadmin_service = GoogleAdminService()
