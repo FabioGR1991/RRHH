@@ -59,13 +59,15 @@ def generar_usernames_candidatos(nombre: str, apellido: str) -> list[str]:
 
 def transformar_legajo_neotel(legajo: str) -> str:
     """
-    Reemplaza el primer dígito del legajo por un '3' para el sistema NeoTel.
-    Ejemplo: '1339' -> '3339'
+    Reemplaza el primer dígito del legajo por '3' para el sistema NeoTel/NEO.
+    Ejemplo: '1237' -> '3237'
     """
-    legajo_str = str(legajo).strip()
-    if not legajo_str:
+    if not legajo:
         return ""
-    return "3" + legajo_str[1:]
+    legajo_str = str(legajo).strip()
+    if legajo_str.startswith("1"):
+        return "3" + legajo_str[1:]
+    return legajo_str
 
 
 def generar_password_segura(longitud: int = 10) -> str:

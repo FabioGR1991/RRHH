@@ -5,6 +5,7 @@ DESCRIPCIÓN: Panel de control para el equipo de Sistemas / IT.
 Maneja:
  - Visualización en tiempo real de las solicitudes de altas enviadas por RRHH.
  - Botón para abrir el Modal de Previsualización de Credenciales.
+ - Adaptación condicional del Modal para Empleados "Fuera de Nómina" (sin AD/Mail/VPN).
  - Ejecución de la aprobación final y aprovisionamiento de cuentas.
 ===================================================================
 -->
@@ -95,7 +96,7 @@ Maneja:
         </div>
     </div>
 
-    <!-- Bootstrap JS (Necesario para el Modal) -->
+    <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
@@ -113,16 +114,18 @@ Maneja:
 
                 data.forEach(sol => {
                     const badgeClass = sol.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success';
+                    const fnBadge = sol.es_fuera_de_nomina ? '<span class="badge bg-warning text-dark ms-1">FN</span>' : '';
+
                     tbody.innerHTML += `
                         <tr>
                             <td class="ps-4 fw-bold">#${sol.id}</td>
                             <td>
                                 <div class="fw-bold">${sol.nombre} ${sol.apellido}</div>
-                                <div class="small text-muted">Reporta a: ${sol.reporta_a}</div>
+                                <div class="small text-muted">Reporta a: ${sol.reporta_a || 'N/A'}</div>
                             </td>
                             <td>
                                 <div class="small">DNI: ${sol.dni}</div>
-                                <div class="small text-muted">Legajo: ${sol.legajo}</div>
+                                <div class="small text-muted">Legajo: ${sol.legajo}${fnBadge}</div>
                             </td>
                             <td><span class="badge bg-secondary">${sol.perfil_ad}</span></td>
                             <td><span class="badge ${badgeClass}">${sol.estado}</span></td>
@@ -140,58 +143,84 @@ Maneja:
         }
 
         async function abrirPreview(id) {
-    document.getElementById('solicitudIdActual').value = id;
-    const container = document.getElementById('previewContent');
-    container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Calculando datos de la planilla...</div>`;
-    
-    const myModal = new bootstrap.Modal(document.getElementById('modalPreview'));
-    myModal.show();
+            document.getElementById('solicitudIdActual').value = id;
+            const container = document.getElementById('previewContent');
+            container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Calculando datos de la planilla...</div>`;
+            
+            const myModal = new bootstrap.Modal(document.getElementById('modalPreview'));
+            myModal.show();
 
-    try {
-        const response = await fetch(`/api/solicitudes/${id}/preview`);
-        const data = await response.json();
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/preview`);
+                const data = await response.json();
 
-        if (response.ok) {
-            container.innerHTML = `
-                <!-- AD / MAIL -->
-                <div class="col-md-6">
-                    <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
-                    <input type="text" class="form-control form-control-sm" value="${data.usuario_ad}" readonly>
-                    <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail}</span></div>
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
-                    <input type="text" class="form-control form-control-sm" value="${data.email}" readonly>
-                </div>
+                if (response.ok) {
+                    // Si el perfil es Fuera de Nómina, ocultamos AD, Mail y VPN Fortinet
+                    if (data.es_fuera_de_nomina) {
+                        container.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-info py-2 small mb-2">
+                                    <i class="bi bi-info-circle-fill me-1"></i> <strong>Empleado Fuera de Nómina:</strong> No se generarán cuentas de Active Directory, Correo Gmail ni VPN Fortinet.
+                                </div>
+                            </div>
 
-                <!-- FORTINET -->
-                <div class="col-md-6">
-                    <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
-                    <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet}" readonly>
-                    <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet}</span></div>
-                </div>
+                            <!-- NEO -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_neo}</span></div>
+                            </div>
 
-                <!-- NEO -->
-                <div class="col-md-6">
-                    <label class="form-label fw-bold small mb-1">Usuario NEO</label>
-                    <input type="text" class="form-control form-control-sm" value="${data.usuario_neo}" readonly>
-                    <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_neo}</span></div>
-                </div>
+                            <!-- X-LITE / POSICIÓN -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite}</span></div>
+                            </div>
+                        `;
+                    } else {
+                        // Vista estándar para empleados regulares
+                        container.innerHTML = `
+                            <!-- AD / MAIL -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_ad}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.email}" readonly>
+                            </div>
 
-                <!-- X-LITE -->
-                <div class="col-md-12">
-                    <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
-                    <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite}" readonly>
-                    <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite}</span></div>
-                </div>
-            `;
-        } else {
-            container.innerHTML = `<div class="alert alert-danger">Error: ${data.detail || 'Desconocido'}</div>`;
+                            <!-- FORTINET -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet}</span></div>
+                            </div>
+
+                            <!-- NEO -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_neo}</span></div>
+                            </div>
+
+                            <!-- X-LITE -->
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite}</span></div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger">Error: ${data.detail || 'Desconocido'}</div>`;
+                }
+            } catch (err) {
+                container.innerHTML = `<div class="alert alert-danger">Error de conexión al generar el preview.</div>`;
+            }
         }
-    } catch (err) {
-        container.innerHTML = `<div class="alert alert-danger">Error de conexión al generar el preview.</div>`;
-    }
-}
 
         async function confirmarAlta() {
             const id = document.getElementById('solicitudIdActual').value;

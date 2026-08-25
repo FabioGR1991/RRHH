@@ -6,9 +6,26 @@
     <title>RRHH - Solicitud de Altas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Librería XLSX para leer/crear archivos Excel desde el navegador -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .card-header-custom { background: #0066ff; color: white; font-weight: 600; }
+        
+        /* Zona Drag & Drop */
+        .drop-zone {
+            border: 2px dashed #0066ff;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            background-color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            background-color: #e6f0ff;
+            border-color: #0044cc;
+        }
     </style>
 </head>
 <body>
@@ -24,57 +41,125 @@
     </nav>
 
     <div class="container-fluid px-4 my-4">
-        <div class="row g-4">
-            
-            <!-- Columna Izquierda: Formulario -->
-            <div class="col-lg-5 col-12">
-                <div class="card shadow-sm border-0 rounded-3">
-                    <div class="card-header card-header-custom p-3 rounded-top">
-                        <i class="bi bi-file-earmark-text me-2"></i>Solicitud de Alta de Nuevo Empleado
-                    </div>
-                    <div class="card-body p-4">
-                        <div id="alertMsg" class="alert d-none mb-3" role="alert"></div>
+        
+        <!-- Pestañas para elegir modo de carga -->
+        <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-bold" id="tab-individual" data-bs-toggle="pill" data-bs-target="#panel-individual" type="button" role="tab">
+                    <i class="bi bi-person-plus me-1"></i> Alta Individual
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-bold" id="tab-masiva" data-bs-toggle="pill" data-bs-target="#panel-masiva" type="button" role="tab">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Carga Masiva (Excel)
+                </button>
+            </li>
+        </ul>
 
-                        <form id="altaForm">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted fw-bold">Nombre</label>
-                                    <input type="text" id="nombre" class="form-control" placeholder="ej. Fabio" required>
+        <div class="row g-4">
+            <!-- Columna Izquierda: Formularios -->
+            <div class="col-lg-5 col-12">
+                <div class="tab-content" id="pills-tabContent">
+                    
+                    <!-- TAB 1: FORMULARIO INDIVIDUAL -->
+                    <div class="tab-pane fade show active" id="panel-individual" role="tabpanel">
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-header card-header-custom p-3 rounded-top">
+                                <i class="bi bi-file-earmark-text me-2"></i>Solicitud de Alta de Nuevo Empleado
+                            </div>
+                            <div class="card-body p-4">
+                                <div id="alertMsg" class="alert d-none mb-3" role="alert"></div>
+
+                                <form id="altaForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Nombre</label>
+                                            <input type="text" id="nombre" class="form-control" placeholder="ej. Fabio" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Apellido</label>
+                                            <input type="text" id="apellido" class="form-control" placeholder="ej. Gomez" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">DNI</label>
+                                            <input type="text" id="dni" class="form-control" placeholder="ej. 40123456" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Legajo</label>
+                                            <input type="text" id="legajo" class="form-control" placeholder="ej. 1339" required>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">Teléfono de Contacto</label>
+                                            <input type="tel" id="telefono" class="form-control" placeholder="ej. 11 1234-5678" required>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <div class="form-check form-switch bg-light p-2 ps-5 rounded border">
+                                                <input class="form-check-input" type="checkbox" id="esFueraNomina">
+                                                <label class="form-check-label fw-bold text-secondary small" for="esFueraNomina">
+                                                    Empleado Fuera de Nómina (Legajo autogenerado 7000+)
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">A quién reporta</label>
+                                            <input type="text" id="reporta_a" class="form-control" placeholder="ej. Juan Pérez (Gerente)" required>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">Perfil / Rol Asignado</label>
+                                            <select id="perfil_ad" class="form-select" required>
+                                                <option value="" selected disabled>Seleccionar perfil...</option>
+                                                <option value="Operador">Operador</option>
+                                                <option value="Administrativo">Administrativo</option>
+                                                <option value="Supervisión">Supervisión</option>
+                                                <option value="Gerencia">Gerencia</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 mt-4">
+                                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">
+                                                <i class="bi bi-send me-2"></i>Enviar Solicitud a IT
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: CARGA MASIVA (EXCEL / DRAG & DROP) -->
+                    <div class="tab-pane fade" id="panel-masiva" role="tabpanel">
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-header bg-dark text-white p-3 rounded-top d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><i class="bi bi-file-earmark-excel me-2"></i>Importación Masiva desde Excel</span>
+                                <button type="button" onclick="descargarPlantilla()" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-download me-1"></i>Plantilla
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div id="alertMsgMasivo" class="alert d-none mb-3" role="alert"></div>
+
+                                <!-- Zona de Arrastre -->
+                                <div id="dropZone" class="drop-zone mb-3">
+                                    <i class="bi bi-cloud-arrow-up display-5 text-primary"></i>
+                                    <p class="fw-bold mb-1 mt-2">Arrastra tu archivo Excel aquí</p>
+                                    <span class="text-muted small">o haz clic para examinar desde tu equipo (.xlsx, .xls)</span>
+                                    <input type="file" id="fileInput" accept=".xlsx, .xls" class="d-none">
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted fw-bold">Apellido</label>
-                                    <input type="text" id="apellido" class="form-control" placeholder="ej. Gomez" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted fw-bold">DNI</label>
-                                    <input type="text" id="dni" class="form-control" placeholder="ej. 40123456" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small text-muted fw-bold">Legajo</label>
-                                    <input type="text" id="legajo" class="form-control" placeholder="ej. 1339" required>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label small text-muted fw-bold">A quién reporta</label>
-                                    <input type="text" id="reporta_a" class="form-control" placeholder="ej. Juan Pérez (Gerente)" required>
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label small text-muted fw-bold">Perfil / Rol Asignado</label>
-                                    <select id="perfil_ad" class="form-select" required>
-                                        <option value="" selected disabled>Seleccionar perfil...</option>
-                                        <option value="Operador">Operador</option>
-                                        <option value="Administrativo">Administrativo</option>
-                                        <option value="Supervisión">Supervisión</option>
-                                        <option value="Gerencia">Gerencia</option>
-                                    </select>
-                                </div>
-                                <div class="col-12 mt-4">
-                                    <button type="submit" class="btn btn-success w-100 py-2 fw-bold">
-                                        <i class="bi bi-send me-2"></i>Enviar Solicitud a IT
+
+                                <div id="previewMasivo" class="d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small fw-bold text-secondary">Registros detectados: <strong id="cantRegistros">0</strong></span>
+                                        <button class="btn btn-sm btn-link text-danger p-0" onclick="limpiarExcel()"><i class="bi bi-trash"></i> Quitar</button>
+                                    </div>
+                                    <button id="btnProcesarMasivo" onclick="procesarCargaMasiva()" class="btn btn-primary w-100 py-2 fw-bold">
+                                        <i class="bi bi-upload me-2"></i>Procesar y Enviar a IT
                                     </button>
                                 </div>
                             </div>
-                        </form>
+                        </div>
                     </div>
+
                 </div>
             </div>
 
@@ -94,7 +179,7 @@
                                     <tr>
                                         <th class="ps-3">#</th>
                                         <th>Empleado</th>
-                                        <th>Legajo</th>
+                                        <th>Legajo / Tel.</th>
                                         <th>Reporta a</th>
                                         <th>Perfil</th>
                                         <th>Estado</th>
@@ -114,8 +199,46 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Cargar solicitudes en el panel de RRHH
+        // Validación estricta de perfiles permitidos
+        const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
+
+        const checkboxFN = document.getElementById('esFueraNomina');
+        const inputLegajo = document.getElementById('legajo');
+        const selectPerfil = document.getElementById('perfil_ad');
+
+        let legajoPrevio = '';
+        let perfilPrevio = '';
+        let datosExcelProcesados = [];
+
+        // Lógica de deshabilitado y autocompletado para Fuera de Nómina
+        checkboxFN.addEventListener('change', async function() {
+            if (this.checked) {
+                legajoPrevio = inputLegajo.value;
+                perfilPrevio = selectPerfil.value;
+
+                inputLegajo.disabled = true;
+                inputLegajo.value = "Obteniendo...";
+                selectPerfil.value = "Operador";
+                selectPerfil.disabled = true;
+
+                try {
+                    const response = await fetch('/api/solicitudes/siguiente-legajo-fn');
+                    const data = await response.json();
+                    inputLegajo.value = data.legajo;
+                } catch (error) {
+                    inputLegajo.value = "7345";
+                }
+            } else {
+                inputLegajo.disabled = false;
+                inputLegajo.value = legajoPrevio;
+                selectPerfil.disabled = false;
+                selectPerfil.value = perfilPrevio;
+            }
+        });
+
+        // Cargar solicitudes en el panel
         async function cargarMisSolicitudes() {
             try {
                 const response = await fetch('/api/solicitudes');
@@ -129,12 +252,9 @@
                 }
 
                 data.forEach(sol => {
-                    const badgeClass = sol.estado === 'PENDIENTE' 
-                        ? 'bg-warning text-dark' 
-                        : 'bg-success';
-                    const estadoTexto = sol.estado === 'PENDIENTE' 
-                        ? '<i class="bi bi-hourglass-split me-1"></i> Pendiente IT' 
-                        : '<i class="bi bi-check-circle me-1"></i> Aprobado';
+                    const badgeClass = sol.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success';
+                    const estadoTexto = sol.estado === 'PENDIENTE' ? '<i class="bi bi-hourglass-split me-1"></i> Pendiente IT' : '<i class="bi bi-check-circle me-1"></i> Aprobado';
+                    const fnBadge = sol.es_fuera_de_nomina ? '<span class="badge bg-warning text-dark me-1">FN</span>' : '';
 
                     tbody.innerHTML += `
                         <tr>
@@ -143,7 +263,10 @@
                                 <div class="fw-bold">${sol.nombre} ${sol.apellido}</div>
                                 <div class="small text-muted">DNI: ${sol.dni}</div>
                             </td>
-                            <td>${sol.legajo}</td>
+                            <td>
+                                <div>${fnBadge}${sol.legajo}</div>
+                                <div class="small text-muted"><i class="bi bi-telephone me-1"></i>${sol.telefono || 'N/A'}</div>
+                            </td>
                             <td><span class="small text-muted">${sol.reporta_a || 'N/A'}</span></td>
                             <td><span class="badge bg-secondary">${sol.perfil_ad}</span></td>
                             <td><span class="badge ${badgeClass}">${estadoTexto}</span></td>
@@ -155,7 +278,7 @@
             }
         }
 
-        // Envío del Formulario
+        // Envío Alta Individual
         document.getElementById('altaForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const alertMsg = document.getElementById('alertMsg');
@@ -165,9 +288,11 @@
                 nombre: document.getElementById('nombre').value,
                 apellido: document.getElementById('apellido').value,
                 dni: document.getElementById('dni').value,
-                legajo: document.getElementById('legajo').value,
+                legajo: inputLegajo.value,
+                telefono: document.getElementById('telefono').value,
                 reporta_a: document.getElementById('reporta_a').value,
-                perfil_ad: document.getElementById('perfil_ad').value
+                perfil_ad: selectPerfil.value,
+                es_fuera_de_nomina: checkboxFN.checked
             };
 
             try {
@@ -184,7 +309,9 @@
                     alertMsg.innerHTML = '<i class="bi bi-check-lg me-2"></i>Solicitud enviada con éxito a IT.';
                     alertMsg.classList.remove('d-none');
                     document.getElementById('altaForm').reset();
-                    cargarMisSolicitudes(); // Refresca la tabla automáticamente
+                    inputLegajo.disabled = false;
+                    selectPerfil.disabled = false;
+                    cargarMisSolicitudes();
                 } else {
                     alertMsg.className = "alert alert-danger";
                     alertMsg.textContent = resData.detail || 'Error al enviar la solicitud.';
@@ -197,9 +324,176 @@
             }
         });
 
+        // --- MANEJO DE DRAG & DROP Y EXCEL ---
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length) leerExcel(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) leerExcel(e.target.files[0]);
+        });
+
+        function leerExcel(archivo) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+                if (!jsonData.length) {
+                    renderizarResultadoMasivo(0, ["El archivo Excel está vacío."]);
+                    return;
+                }
+
+                datosExcelProcesados = jsonData.map((row) => {
+                    let perfilIngresado = String(row.Perfil || row["Perfil AD"] || '').trim();
+                    const perfilValido = PERFILES_PERMITIDOS.find(
+                        p => p.toLowerCase() === perfilIngresado.toLowerCase()
+                    );
+                    const perfilFinal = perfilValido || "Operador";
+
+                    return {
+                        nombre: String(row.Nombre || '').trim(),
+                        apellido: String(row.Apellido || '').trim(),
+                        dni: String(row.DNI || '').trim(),
+                        legajo: String(row.Legajo || '').trim(),
+                        telefono: String(row.Telefono || row["Teléfono"] || '').trim(),
+                        reporta_a: String(row["Reporta A"] || row.ReportaA || '').trim(),
+                        perfil_ad: perfilFinal,
+                        es_fuera_de_nomina: false
+                    };
+                });
+
+                document.getElementById('cantRegistros').textContent = datosExcelProcesados.length;
+                document.getElementById('previewMasivo').classList.remove('d-none');
+                document.getElementById('alertMsgMasivo').classList.add('d-none');
+            };
+            reader.readAsArrayBuffer(archivo);
+        }
+
+        function limpiarExcel() {
+            datosExcelProcesados = [];
+            fileInput.value = '';
+            document.getElementById('previewMasivo').classList.add('d-none');
+        }
+
+        async function procesarCargaMasiva() {
+            const btn = document.getElementById('btnProcesarMasivo');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando solicitudes...`;
+
+            let correctos = 0;
+            let errores = [];
+
+            for (let i = 0; i < datosExcelProcesados.length; i++) {
+                const item = datosExcelProcesados[i];
+                const numFila = i + 2; // +2 contemplando encabezados de la fila 1 en Excel
+
+                try {
+                    const res = await fetch('/api/solicitudes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(item)
+                    });
+
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        correctos++;
+                    } else {
+                        const motivo = data.detail || "Error al procesar la solicitud.";
+                        errores.push(`Fila ${numFila} (${item.nombre} ${item.apellido}): ${motivo}`);
+                    }
+                } catch (err) {
+                    errores.push(`Fila ${numFila} (${item.nombre} ${item.apellido}): Error de conexión con el servidor.`);
+                }
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-upload me-2"></i>Procesar y Enviar a IT`;
+
+            renderizarResultadoMasivo(correctos, errores);
+            cargarMisSolicitudes();
+        }
+
+        function renderizarResultadoMasivo(correctos, errores) {
+            const alertBox = document.getElementById('alertMsgMasivo');
+            alertBox.classList.remove('d-none');
+
+            const totalFallos = errores.length;
+            const tipoAlerta = totalFallos === 0 ? 'success' : (correctos > 0 ? 'warning' : 'danger');
+
+            let html = `
+                <div class="fw-bold mb-1">
+                    <i class="bi ${totalFallos === 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-1"></i>
+                    Proceso terminado: ${correctos} exitosas, ${totalFallos} con error.
+                </div>
+            `;
+
+            if (totalFallos > 0) {
+                html += `
+                    <div class="mt-2 text-start">
+                        <div class="fw-bold small text-danger mb-1">Detalle de inconvenientes:</div>
+                        <ul class="list-group list-group-flush border rounded bg-white small" style="max-height: 180px; overflow-y: auto;">
+                `;
+                
+                errores.forEach(err => {
+                    html += `<li class="list-group-item list-group-item-danger py-1 px-2 text-wrap small"><sup>•</sup> ${err}</li>`;
+                });
+
+                html += `
+                        </ul>
+                    </div>
+                `;
+            }
+
+            alertBox.className = `alert alert-${tipoAlerta} p-3 mb-3`;
+            alertBox.innerHTML = html;
+
+            if (totalFallos === 0) {
+                limpiarExcel();
+            }
+        }
+
+        function descargarPlantilla() {
+            const wb = XLSX.utils.book_new();
+            
+            const wsData = [
+                ["Nombre", "Apellido", "DNI", "Legajo", "Telefono", "Reporta A", "Perfil"],
+                ["Juan", "Pérez", "38999888", "1234", "1155443322", "Carlos Gómez", "Operador"],
+                ["María", "López", "40111222", "1235", "1166778899", "Ana Martinez", "Administrativo"],
+                ["Pedro", "Sosa", "35444555", "1236", "1122334455", "Roberto Diaz", "Supervisión"],
+                ["Laura", "Gimenez", "30999111", "1237", "1133221100", "Directorio", "Gerencia"]
+            ];
+            
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Altas");
+            XLSX.writeFile(wb, "Plantilla_Altas_RRHH.xlsx");
+        }
+
         // Inicializar
         cargarMisSolicitudes();
-        // Sincronización automática cada 5 segundos para que RRHH vea cuando IT aprueba
         setInterval(cargarMisSolicitudes, 5000);
     </script>
 </body>
