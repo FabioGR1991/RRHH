@@ -477,44 +477,43 @@ async def exportar_solicitudes_excel(
         creds = preview_full["propuesta_credenciales"]
 
         filas.append({
-            "Mail": (
-                creds["google_workspace"]["email"]
-                if not s.es_fuera_de_nomina
-                else "-"
-            ),
-            "Clave Mail": (
-                creds["google_workspace"]["password_temp"]
-                if not s.es_fuera_de_nomina
-                else "-"
-            ),
-            "Nro. Cel": "-",
-            "Usuario AD": (
-                creds["active_directory"]["username"]
-                if not s.es_fuera_de_nomina
-                else "-"
-            ),
-            "Clave AD": (
-                creds["active_directory"]["password_temp"]
-                if not s.es_fuera_de_nomina
-                else "-"
-            ),
-            "Usuario Fortinet (VPN 100 F)": (
-                creds["forticlient"]["username"] if not s.es_fuera_de_nomina else "-"
-            ),
-            "Clave Fortinet (DNI)": (
-                creds["forticlient"]["password_temp"]
-                if not s.es_fuera_de_nomina
-                else "-"
-            ),
-            "USUARIO NEO": creds["neotel"]["telemarketer_user"],
-            "CLAVE 9": f"9{creds['neotel']['telemarketer_user']}",
-            "NOMBRE": s.nombre.title(),
-            "APELLIDO": s.apellido.title(),
-            "Dispositivo posición (X-Lite)": creds["neotel"]["posicion_user"],
-            "CLAVE": creds["neotel"]["posicion_pass"],
-            "Superior": s.reporta_a,
-        })
-
+    "Mail": (
+        creds["google_workspace"]["email"]
+        if not s.es_fuera_de_nomina
+        else "-"
+    ),
+    "Clave Mail": (
+        creds["google_workspace"]["password_temp"]
+        if not s.es_fuera_de_nomina
+        else "-"
+    ),
+    "Nro. Cel": s.telefono if getattr(s, "telefono", None) else "-",  # 👈 Mapeo dinámico del celular
+    "Usuario AD": (
+        creds["active_directory"]["username"]
+        if not s.es_fuera_de_nomina
+        else "-"
+    ),
+    "Clave AD": (
+        creds["active_directory"]["password_temp"]
+        if not s.es_fuera_de_nomina
+        else "-"
+    ),
+    "Usuario Fortinet (VPN 100 F)": (
+        creds["forticlient"]["username"] if not s.es_fuera_de_nomina else "-"
+    ),
+    "Clave Fortinet (DNI)": (
+        creds["forticlient"]["password_temp"]
+        if not s.es_fuera_de_nomina
+        else "-"
+    ),
+    "USUARIO NEO": creds["neotel"]["telemarketer_user"],
+    "CLAVE 9": f"9{creds['neotel']['telemarketer_user']}",
+    "NOMBRE": s.nombre.title(),
+    "APELLIDO": s.apellido.title(),
+    "Dispositivo posición (X-Lite)": creds["neotel"]["posicion_user"],
+    "CLAVE": creds["neotel"]["posicion_pass"],
+    "Superior": s.reporta_a,
+})
     df = pd.DataFrame(filas)
 
     output = io.BytesIO()
