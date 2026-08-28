@@ -17,6 +17,7 @@ import openpyxl
 import pandas as pd
 from pydantic import BaseModel
 import requests
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from src.core.generator import generar_preview_credenciales
 from src.models.solicitud import SolicitudAlta
@@ -132,23 +133,34 @@ def crear_solicitud(solicitud: SolicitudCreate, db: Session = Depends(get_db)):
         legajo=solicitud.legajo,
         perfil_ad=solicitud.perfil_ad,
         reporta_a=solicitud.reporta_a,
-        telefono=solicitud.telefono,
         es_fuera_de_nomina=solicitud.es_fuera_de_nomina,
         estado="PENDIENTE",
     )
-    db.add(nueva_solicitud)
-    db.commit()
-    db.refresh(nueva_solicitud)
+    
+    try:
+        db.add(nueva_solicitud)
+        db.commit()
+        db.refresh(nueva_solicitud)
+    except IntegrityError as ie:
+        db.rollback()
+        logger.error(f"Error de integridad en BD: {ie}")
+        raise HTTPException(
+            status_code=400, detail="El DNI o Legajo ingresado ya existe en la base de datos."
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error inesperado al guardar solicitud: {e}")
+        raise HTTPException(status_code=500, detail="Error interno al guardar la solicitud.")
 
     # Notificar automáticamente a Zammad
     try:
         crear_ticket_zammad(solicitud.dict(), es_masivo=False)
     except Exception as e:
-        logger.error(f"Error al generar ticket en Zammad: {e}")
+        logger.error(f"Error no bloqueante al generar ticket en Zammad: {e}")
 
     return {
         "status": "success",
-        "message": "Solicitud creada",
+        "message": "Solicitud creada exitosamente",
         "data_id": nueva_solicitud.id,
     }
 
@@ -212,11 +224,6 @@ async def cargar_solicitudes_masiva(
             if pd.notna(row.get("reporta_a"))
             else ""
         )
-        telefono = (
-            str(row.get("telefono", row.get("teléfono", ""))).strip()
-            if pd.notna(row.get("telefono", row.get("teléfono")))
-            else ""
-        )
 
         if not nombre or not apellido or not dni or not legajo:
             errores.append(
@@ -230,8 +237,7 @@ async def cargar_solicitudes_masiva(
         )
         if existe_dni:
             errores.append(
-                f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} ya está"
-                " registrado."
+                f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} ya está registrado."
             )
             continue
 
@@ -240,8 +246,7 @@ async def cargar_solicitudes_masiva(
         )
         if existe_legajo:
             errores.append(
-                f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} ya está"
-                " registrado."
+                f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} ya está registrado."
             )
             continue
 
@@ -250,9 +255,8 @@ async def cargar_solicitudes_masiva(
             apellido=apellido,
             dni=dni,
             legajo=legajo,
-            perfil_ad=perfil_ad,
-            reporta_a=reporta_a,
-            telefono=telefono,
+            perfil_ad=perfil_ad if perfil_ad else "Operador",
+            reporta_a=reporta_a if reporta_a else "No especificado",
             es_fuera_de_nomina=False,
             estado="PENDIENTE",
         )
@@ -260,12 +264,17 @@ async def cargar_solicitudes_masiva(
         exitos += 1
 
     if exitos > 0:
-        db.commit()
-        # Notificar a Zammad sobre la carga masiva realizada
         try:
-            crear_ticket_zammad({}, es_masivo=True, total_registros=exitos)
+            db.commit()
+            # Notificar a Zammad sobre la carga masiva realizada
+            try:
+                crear_ticket_zammad({}, es_masivo=True, total_registros=exitos)
+            except Exception as e:
+                logger.error(f"Error no bloqueante al generar ticket masivo en Zammad: {e}")
         except Exception as e:
-            logger.error(f"Error al generar ticket masivo en Zammad: {e}")
+            db.rollback()
+            logger.error(f"Error al commitear lote masivo: {e}")
+            raise HTTPException(status_code=500, detail="Error al guardar el lote de solicitudes en BD.")
 
     return {
         "status": "success",
@@ -365,8 +374,7 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
         await crear_usuario_neotel(creds["neotel"])
     except Exception as e:
         logger.error(
-            f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}:"
-            f" {e}"
+            f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}: {e}"
         )
         raise HTTPException(
             status_code=500, detail=f"Error al aprovisionar cuentas: {str(e)}"
@@ -479,7 +487,7 @@ async def exportar_solicitudes_excel(
                 if not s.es_fuera_de_nomina
                 else "-"
             ),
-            "Nro. Cel": getattr(s, "telefono", "N/A"),
+            "Nro. Cel": "-",
             "Usuario AD": (
                 creds["active_directory"]["username"]
                 if not s.es_fuera_de_nomina

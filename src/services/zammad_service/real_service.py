@@ -4,7 +4,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-ZAMMAD_URL = os.getenv("ZAMMAD_URL", "https://tu-zammad.dominio.com/api/v1/tickets")
+ZAMMAD_URL = os.getenv("ZAMMAD_URL", "https://ticketera.tandemtech.com.ar/api/v1/tickets")
 ZAMMAD_TOKEN = os.getenv("ZAMMAD_TOKEN", "TU_TOKEN_AQUI")
 
 
@@ -46,7 +46,10 @@ def crear_ticket_zammad(
     payload = {
         "title": title,
         "group": "Users",
-        "customer": "solicitudes.rrhh@dominio.com",
+        "customer": "solicitudes.rrhh@tandemtech.com.ar",
+        "type": "RRHH - Solicitud de contratación",  # Campo mapeado desde dropdown
+        "state": "new",
+        "priority": "2 normal",
         "article": {
             "subject": title,
             "body": body,
