@@ -4,6 +4,7 @@ ARCHIVO: main.py
 DESCRIPCIÓN: Punto de entrada principal de la aplicación FastAPI.
 Maneja:
  - Inicialización de la App y creación de tablas en la Base de Datos.
+ - Configuración Middleware de CORS.
  - Vistas HTML de navegación (Login, RRHH y Sistemas).
  - Endpoints generales (Login, Logout).
  - Inclusión de Routers/Módulos externos (solicitudes_controller).
@@ -12,6 +13,7 @@ Maneja:
 
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -32,7 +34,16 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Inclusión del router de solicitudes (incluye el nuevo endpoint GET /api/solicitudes/{id}/preview)
+# --- CONFIGURACIÓN DE CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Inclusión del router de solicitudes
 app.include_router(solicitudes_controller.router)
 
 templates = Jinja2Templates(directory="config/templates")
