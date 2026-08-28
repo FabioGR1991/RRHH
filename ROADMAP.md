@@ -183,22 +183,23 @@ RRHH
 │   ├── controllers
 │   │   └── solicitudes_controller.py
 │   ├── core
-│   │   ├── generator.py
-│   │   └── orchestrator.py
+│   │   └── generator.py
 │   ├── models
 │   │   ├── solicitud.py
 │   │   └── usuario.py
 │   └── services
-│       ├── ad_service/
+│       ├── ad_service
 │       ├── email_service.py
-│       ├── fortinet_service/
-│       ├── gadmin_service/
-│       ├── neo_service/
+│       ├── fortinet_service
+│       ├── gadmin_service
+│       ├── neo_service
 │       ├── pdf_service.py
-│       └── xlite_service/
+│       ├── xlite_service
+│       └── zammad_service
 └── storage
-    ├── pdfs/
-    └── qrs/
+    ├── pdfs
+    └── qrs
+(venv) 
 
 
     ⚙️ Guía de Modos de Ejecución (Entornos de Red / Configuración)
