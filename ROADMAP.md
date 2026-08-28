@@ -22,7 +22,9 @@ Plataforma web para la automatización y gestión del ciclo de vida de usuarios 
                                                                ▼
                                                             6. Se genera Output (Dashboard + PDF + Mails)
 
-                                                            📌 Fase 1: Arquitectura Base y Modelado de Datos
+                                                            
+                                                            
+📌 Fase 1: Arquitectura Base y Modelado de Datos
 Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para la cola de pendientes y los esquemas de datos del sistema.
 
 [x] ~~1.1. Inicialización del Proyecto~~
@@ -98,6 +100,14 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Creación de usuario local NombreApellido con contraseña igual a DNI, asignación del mail institucional para 2FA y adición al grupo de túnel VPN.
 
+[x] ~~2.6. Módulo de Integración con Ticketera Zammad (src/services/zammad_service)~~
+
+[x] ~~Estructura modular con patrón Strategy (dummy_service.py, real_service.py, __init__.py).~~
+
+[x] ~~Consumo de API REST para generación automática de tickets en carga individual y masiva.~~
+
+[x] ~~Conmutación transparente vía DUMMY_MODE / MODE en config/settings.py.~~
+
 ⚙️ Fase 3: El Orquestador de Altas (src/core/orchestrator.py)
 Objetivo: Crear el motor principal que ejecuta las llamadas a todos los servicios en el orden correcto y gestiona los fallos.
 
@@ -128,8 +138,8 @@ Objetivo: Generar la documentación para el empleado y disparar las notificacion
 
 [ ] Descarga de reporte ordenado en formato .csv / .xlsx coincidente con el esquema de la planilla interna.
 
-💻 Fase 5: Desarrollo de la Interfaz Web (Frontend)
-Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
+💻 Fase 5: Desarrollo de la Interfaz Web (Frontend) y Despliegue Piloto Intranet
+Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT, y habilitar la prueba en la intranet.
 
 [x] ~~5.1. Vista de RRHH (config/templates/rrhh_form.html)~~
 
@@ -156,6 +166,14 @@ Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT.
 [ ] Botón interactivo 🚀 Confirmar y Ejecutar Alta con feedback visual / barra de progreso en vivo.
 
 [ ] Vista previa final de credenciales creadas + Botones para copiar texto individualmente, descargar PDF y exportar CSV.
+
+[x] ~~5.3. Configuración de Hosting Local / Piloto Intranet~~
+
+[x] ~~Binding Uvicorn en 0.0.0.0 para acceso vía IP/Hostname en red local.~~
+
+[x] ~~Regla de Firewall de Windows (Puerto 8000).~~
+
+[x] ~~Modo Operacional Híbrido: RRHH opera en red local, Zammad genera ticket y los servicios de creación en plataformas se mantienen en DUMMY_MODE para contención y prueba.~~
 
 🛡️ Fase 6: Pruebas, Seguridad y Auditoría
 Objetivo: Asegurar el entorno, validar credenciales y vincular con monitoreo SIEM.
