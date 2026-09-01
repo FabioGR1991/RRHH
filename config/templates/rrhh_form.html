@@ -230,19 +230,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
+    // 1. Constantes y variables de estado global
+    const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
+    
+    let checkboxFN;
+    let inputLegajo;
+    let selectPerfil;
+    let legajoPrevio = '';
+    let perfilPrevio = '';
+    let datosExcelProcesados = [];
 
-        const checkboxFN = document.getElementById('esFueraNomina');
-        const inputLegajo = document.getElementById('legajo');
-        const selectPerfil = document.getElementById('perfil_ad');
+    // 2. Inicialización segura cuando el HTML esté listo
+    document.addEventListener('DOMContentLoaded', () => {
+        // Asegurar que los IDs coincidan exactamente con tu HTML
+        checkboxFN = document.getElementById('es_fuera_de_nomina') || document.getElementById('esFueraNomina');
+        inputLegajo = document.getElementById('legajo');
+        selectPerfil = document.getElementById('perfil_ad');
 
-        let legajoPrevio = '';
-        let perfilPrevio = '';
-        let datosExcelProcesados = [];
-
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarMisSolicitudes();
-        });
+        cargarMisSolicitudes();
+    });
 
         checkboxFN.addEventListener('change', async function() {
             if (this.checked) {
@@ -338,6 +344,7 @@
             }
         }
 
+       /* --- VER DETALLE Y CREDENCIALES --- */
         async function verDetalleAprobado(id) {
             const container = document.getElementById('detalleCredencialesContent');
             container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Cargando credenciales...</div>`;
@@ -404,6 +411,7 @@
             }
         }
 
+        /* --- ENVÍO DE FORMULARIO INDIVIDUAL --- */
         document.getElementById('altaForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const alertMsg = document.getElementById('alertMsg');
@@ -449,6 +457,7 @@
             }
         });
 
+        /* --- MANEJO DE ARCHIVOS EXCEL Y CARGA MASIVA --- */
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
 
@@ -616,7 +625,7 @@
             XLSX.writeFile(wb, "Plantilla_Altas_RRHH.xlsx");
         }
 
-        /* --- FUNCIONES DE SELECCIÓN Y EXPORTACIÓN --- */
+        /* --- SELECCIÓN Y EXPORTACIÓN EN TABLA --- */
         function toggleSelectAll(master) {
             const checkboxes = document.querySelectorAll('.item-check');
             checkboxes.forEach(cb => cb.checked = master.checked);
@@ -671,6 +680,7 @@
             }
         }
 
+        // Refresco periódico del listado cada 5 segundos
         setInterval(cargarMisSolicitudes, 5000);
     </script>
 </body>
