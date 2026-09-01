@@ -1,19 +1,50 @@
+# ==========================================
+# CORE WEB FRAMEWORK & SERVIDOR (ACTIVOS)
+# ==========================================
 fastapi>=0.111.0
 uvicorn[standard]>=0.30.1
 pydantic>=2.8.2
 python-dotenv>=1.0.1
-sqlalchemy>=2.0.31
-requests>=2.32.3
-paramiko>=3.4.0
-jinja2>=3.1.4
-weasyprint>=62.3
 python-multipart>=0.0.9
-google-api-python-client>=2.100.0
-google-auth-httplib2>=0.1.1
-google-auth-oauthlib>=1.1.0
-pandas>=2.2.2
-openpyxl>=3.1.5
-reportlab>=5.0.1
+jinja2>=3.1.4
+
+# ==========================================
+# BASE DE DATOS & ORM
+# ==========================================
+sqlalchemy>=2.0.31
+psycopg2-binary>=2.9.9        # [PENDIENTE] Driver para PostgreSQL en Producción (actualmente SQLite)
+
+# ==========================================
+# SERVICIOS E INTEGRACIONES DE RED
+# ==========================================
+requests>=2.32.3               # Consumo API Zammad y REST APIs
+paramiko>=3.4.0                # SSH/FortiGate (SSH)
+ldap3>=2.9.1                   # [PENDIENTE] Integración con Active Directory (AD)
+
+# ==========================================
+# SDK GOOGLE WORKSPACE
+# ==========================================
+google-api-python-client>=2.100.0  # [PENDIENTE] Creación de cuentas Gmail/Workspace
+google-auth-httplib2>=0.1.1       # [PENDIENTE] Autenticación Service Account Google
+google-auth-oauthlib>=1.1.0        # [PENDIENTE] OAuth Google
+
+# ==========================================
+# PROCESAMIENTO DE DATOS & EXCEL (ACTIVOS)
+# ==========================================
+pandas>=2.2.2                  # Carga masiva y reportes
+openpyxl>=3.1.5                # Lectura/Escritura de archivos .xlsx
+
+# ==========================================
+# GENERACIÓN DE DOCUMENTOS, PDF & QR
+# ==========================================
+weasyprint>=62.3               # [PENDIENTE] Renderizado HTML a PDF de Bienvenida
+reportlab>=5.0.1               # [PENDIENTE] Generación alternativa de PDFs
+Pillow>=10.4.0                 # [PENDIENTE] Manejo de imágenes / Códigos QR (NeoTel)
+
+# ==========================================
+# SEGURIDAD & ENCRIPTACIÓN
+# ==========================================
+passlib[bcrypt]>=1.7.4         # [PENDIENTE] Hashing de contraseñas de usuarios del sistema
 
 LANZARELMODODUMMY >= uvicorn main:app --reload --reload-dir src
 
