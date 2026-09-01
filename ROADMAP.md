@@ -8,7 +8,7 @@ Plataforma web para la automatización y gestión del ciclo de vida de usuarios 
    ▼                                                           ▼
 1. Completa Formulario / Carga Masiva (Excel)           3. Revisa Solicitudes Pendientes
    (Nombre, Apellido, DNI, Legajo,                             │
-    Reporta a, Perfil, Fuera de Nómina)                        ▼
+    Teléfono, Reporta a, Perfil, Fuera de Nómina)              ▼
    │                                                    4. Click en "Previsualizar Credenciales"
    ▼                                                       (Genera propuesta de User, Mail, Pass, Neo, Forti)
 2. Guarda Solicitud en estado "PENDIENTE"                      │
@@ -22,49 +22,47 @@ Plataforma web para la automatización y gestión del ciclo de vida de usuarios 
                                                                ▼
                                                             6. Se genera Output (Dashboard + PDF + Mails)
 
-                                                            
-                                                            
-📌 Fase 1: Arquitectura Base y Modelado de Datos
+                                                            📌 Fase 1: Arquitectura Base y Modelado de Datos
 Objetivo: Definir la estructura del proyecto en VS Code, la base de datos para la cola de pendientes y los esquemas de datos del sistema.
 
-[x] ~~1.1. Inicialización del Proyecto~~
+[x] 1.1. Inicialización del Proyecto
 
-[x] ~~Configurar repositorio Git y entorno virtual en Python (FastAPI + Pydantic).~~
+[x] Configurar repositorio Git y entorno virtual en Python (FastAPI + Pydantic).
 
-[x] ~~Crear la estructura modular de carpetas (/config, /src/controllers, /src/core, /src/services, /src/models).~~
+[x] Crear la estructura modular de carpetas (/config, /src/controllers, /src/core, /src/services, /src/models).
 
-[x] ~~Definir el archivo .env.example y gestión de entorno con las variables necesarias (claves API, credenciales SSH/LDAP, servidor SMTP).~~
+[x] Definir el archivo .env.example y gestión de entorno con las variables necesarias (claves API, credenciales SSH/LDAP, servidor SMTP).
 
-[x] ~~Configuración y estabilización de dependencias base (requirements.txt: FastAPI, Uvicorn, SQLAlchemy, Pandas, OpenPyXL, Python-Multipart).~~
+[x] Configuración y estabilización de dependencias base (requirements.txt: FastAPI, Uvicorn, SQLAlchemy, Pandas, OpenPyXL, Python-Multipart).
 
-[x] ~~1.2. Base de Datos & Cola de Pendientes~~
+[x] 1.2. Base de Datos & Cola de Pendientes
 
-[x] ~~Configurar la base de datos (SQLite para desarrollo / PostgreSQL para producción).~~
+[x] Configurar la base de datos (SQLite para desarrollo / PostgreSQL para producción).
 
-[x] ~~Diseñar el modelo SolicitudAlta con los estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO / PROCESADO / APROBADO.~~
+[x] Diseñar el modelo SolicitudAlta con los estados: PENDIENTE, EN_PROCESO, COMPLETADO, ERROR_PARCIAL, RECHAZADO.
 
-[x] ~~Incorporación del campo reporta_a (Responsable/Jefe directo) y flag es_fuera_de_nomina en modelo y esquemas Pydantic.~~
+[x] Incorporación de los campos telefono, reporta_a (Responsable/Jefe directo) y flag es_fuera_de_nomina en modelo y esquemas Pydantic.
 
-[x] ~~Validaciones y restricciones de unicidad a nivel base de datos (DNI y Legajo únicos).~~
+[x] Validaciones y restricciones de unicidad a nivel base de datos (DNI y Legajo únicos).
 
-[x] ~~Implementar el sistema de Roles y Permisos (Rol RRHH vs. Rol IT / SISTEMAS con autenticación por Cookies/Sesión).~~
+[x] Implementar el sistema de Roles y Permisos (Rol RRHH vs. Rol IT / SISTEMAS con autenticación por Cookies/Sesión).
 
 🧩 Fase 2: Desarrollo de Módulos de Integración (Servicios Independientes)
 Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una de las plataformas externas.
 
-[x] ~~2.1. Módulo Core de Lógica de Negocio (src/core/generator.py)~~
+[x] 2.1. Módulo Core de Lógica de Negocio (src/core/generator.py)
 
-[x] ~~Implementar la función de resolución de nombres de usuario y sanitización de caracteres especiales/acentos.~~
+[x] Implementar la función de resolución de nombres de usuario y sanitización de caracteres especiales/acentos.
 
-[x] ~~Lógica de resolución de colisiones (alternativas fgomez, fabiogomez, fabiogomez1).~~
+[x] Lógica de resolución de colisiones (alternativas fgomez, fabiogomez, fabiogomez1).
 
-[x] ~~Implementar la transformación lógica de Legajo para NeoTel.~~
+[x] Implementar la transformación lógica de Legajo para NeoTel.
 
-[x] ~~Función de generación de propuesta de credenciales (Username, Email, Passwords temporales, NeoTel, FortiClient, X-Lite alineados a la planilla operativa) para previsualización.~~
+[x] Función de generación de propuesta de credenciales (Username, Email, Passwords temporales, NeoTel, FortiClient, X-Lite alineados a la planilla operativa) para previsualización.
 
-[x] ~~Desacoplamiento de rutas en src/controllers/solicitudes_controller.py para limpiar main.py y estandarizar respuestas API.~~
+[x] Desacoplamiento de rutas en src/controllers/solicitudes_controller.py para limpiar main.py y estandarizar respuestas API.
 
-[x] ~~Endpoint /api/solicitudes/siguiente-legajo-fn para autogeneración incremental de legajos para personal Fuera de Nómina (Rango 7000+).~~
+[x] Endpoint /api/solicitudes/siguiente-legajo-fn para autogeneración incremental de legajos para personal Fuera de Nómina (Rango 7000+).
 
 [ ] 2.2. Módulo Active Directory (src/services/ad_service)
 
@@ -100,20 +98,20 @@ Objetivo: Desarrollar y probar por separado la conexión y lógica con cada una 
 
 [ ] Creación de usuario local NombreApellido con contraseña igual a DNI, asignación del mail institucional para 2FA y adición al grupo de túnel VPN.
 
-[x] ~~2.6. Módulo de Integración con Ticketera Zammad (src/services/zammad_service)~~
+[x] 2.6. Módulo de Integración con Ticketera Zammad (src/services/zammad_service)
 
-[x] ~~Estructura modular con patrón Strategy (dummy_service.py, real_service.py, __init__.py).~~
+[x] Estructura modular con patrón Strategy (dummy_service.py, real_service.py, __init__.py).
 
-[x] ~~Consumo de API REST para generación automática de tickets en carga individual y masiva.~~
+[x] Consumo de API REST para generación automática de tickets en carga individual y masiva.
 
-[x] ~~Conmutación transparente vía DUMMY_MODE / MODE en config/settings.py.~~
+[x] Conmutación transparente vía DUMMY_MODE / MODE en config/settings.py.
 
 ⚙️ Fase 3: El Orquestador de Altas (src/core/orchestrator.py)
 Objetivo: Crear el motor principal que ejecuta las llamadas a todos los servicios en el orden correcto y gestiona los fallos.
 
-[x] ~~3.1. Fase de Pre-Validación (Dry-Run / Preview)~~
+[x] 3.1. Fase de Pre-Validación (Dry-Run / Preview)
 
-[x] ~~Generar payload de vista previa antes de la ejecución real mediante /api/solicitudes/{id}/preview.~~
+[x] Generar payload de vista previa antes de la ejecución real mediante /api/solicitudes/{id}/preview.
 
 [ ] 3.2. Flujo Secuencial de Ejecución Real
 
@@ -141,39 +139,47 @@ Objetivo: Generar la documentación para el empleado y disparar las notificacion
 💻 Fase 5: Desarrollo de la Interfaz Web (Frontend) y Despliegue Piloto Intranet
 Objetivo: Construir la plataforma visual adaptada a los roles de RRHH e IT, y habilitar la prueba en la intranet.
 
-[x] ~~5.1. Vista de RRHH (config/templates/rrhh_form.html)~~
+[x] 5.1. Vista de RRHH (config/templates/rrhh_form.html y JavaScripts asoc.)
 
-[x] ~~Formulario de solicitud individual (Nombre, Apellido, DNI, Legajo, Reporta a, Perfil, Fuera de Nómina).~~
+[x] Formulario de solicitud individual (Nombre, Apellido, DNI, Legajo, Teléfono, Reporta a, Perfil, Fuera de Nómina).
 
-[x] ~~Automatización de campo Legajo / Perfil al marcar el switch "Empleado Fuera de Nómina".~~
+[x] Validaciones estrictas frontend y backend de formato y longitud en campos clave:
 
-[x] ~~Módulo de Carga Masiva desde archivo Excel (.xlsx, .xls) con interfaz Drag & Drop y botón de descarga de plantilla especificada.~~
+DNI: Filtro en tiempo real para bloquear caracteres no numéricos, restricción de 8 dígitos exactos (maxlength="8", pattern="\d{8}") y validación Regex previa a envío HTTP.
 
-[x] ~~Parseo dinámico con filtrado y mapeo de perfiles permitidos (Operador, Administrativo, Supervisión, Gerencia).~~
+Legajo: Bloqueo de caracteres no numéricos, restricción de 4 dígitos exactos (maxlength="4", pattern="\d{4}") y conmutación dinámica al activar "Fuera de Nómina".
 
-[x] ~~Feedback de errores granulares de carga masiva: tarjeta con scroll que lista número de fila Excel, nombre de postulante y motivo del fallo (ej. DNI/Legajo duplicado).~~
+Teléfono: Bloqueo de texto, rango numérico permitido de 6 a 10 dígitos (maxlength="10", pattern="\d{6,10}").
 
-[x] ~~Tabla de historial de solicitudes enviadas por RRHH y sincronización automática en tiempo real (polling cada 5s).~~
+[x] Automatización de campo Legajo / Perfil al marcar el switch "Empleado Fuera de Nómina".
 
-[x] ~~Rediseño UX/UI de tabla RRHH: Separación de badge visual indicador del estado (Aprobado) respecto al botón de acción interactivo (icono de carpeta bi-folder2-open) para consultar el modal de credenciales procesadas.~~
+[x] Módulo de Carga Masiva desde archivo Excel (.xlsx, .xls) con interfaz Drag & Drop y botón de descarga de plantilla especificada.
+
+[x] Parseo dinámico con filtrado y mapeo de perfiles permitidos (Operador, Administrativo, Supervisión, Gerencia).
+
+[x] Feedback de errores granulares de carga masiva: tarjeta con scroll que lista número de fila Excel, nombre de postulante y motivo del fallo (ej. DNI/Legajo duplicado o invalidez de formato).
+
+[x] Tabla de historial de solicitudes enviadas por RRHH y sincronización automática en tiempo real (polling cada 5s).
+
+[x] Rediseño UX/UI de tabla RRHH: Separación de badge visual indicador del estado (Aprobado) respecto al botón de acción interactivo (icono de carpeta bi-folder2-open) para consultar el modal de credenciales procesadas.
 
 [ ] 5.2. Vista de IT (config/templates/sistemas_dashboard.html)
 
-[x] ~~Dashboard básico y verificación de autenticación de rol SISTEMAS.~~
+[x] Dashboard básico y verificación de autenticación de rol SISTEMAS.
 
-[x] ~~Modal de Previsualización de Credenciales (muestra propuesta de Mail Corp, Usuario AD, Usuario/Clave Fortinet, Usuario/Clave NeoTel y Dispositivo X-Lite).~~
+[x] Modal de Previsualización de Credenciales (muestra propuesta de Mail Corp, Usuario AD, Usuario/Clave Fortinet, Usuario/Clave NeoTel y Dispositivo X-Lite).
 
 [ ] Botón interactivo 🚀 Confirmar y Ejecutar Alta con feedback visual / barra de progreso en vivo.
 
 [ ] Vista previa final de credenciales creadas + Botones para copiar texto individualmente, descargar PDF y exportar CSV.
 
-[x] ~~5.3. Configuración de Hosting Local / Piloto Intranet~~
+[x] 5.3. Configuración de Hosting Local / Piloto Intranet
 
-[x] ~~Binding Uvicorn en 0.0.0.0 para acceso vía IP/Hostname en red local.~~
+[x] Binding Uvicorn en 0.0.0.0 para acceso vía IP/Hostname en red local.
 
-[x] ~~Regla de Firewall de Windows (Puerto 8000).~~
+[x] Regla de Firewall de Windows (Puerto 8000).
 
-[x] ~~Modo Operacional Híbrido: RRHH opera en red local, Zammad genera ticket y los servicios de creación en plataformas se mantienen en DUMMY_MODE para contención y prueba.~~
+[x] Modo Operacional Híbrido: RRHH opera en red local, Zammad genera ticket y los servicios de creación en plataformas se mantienen en DUMMY_MODE para contención y prueba.
 
 🛡️ Fase 6: Pruebas, Seguridad y Auditoría
 Objetivo: Asegurar el entorno, validar credenciales y vincular con monitoreo SIEM.
@@ -214,33 +220,39 @@ RRHH
 │       ├── pdf_service.py
 │       ├── xlite_service
 │       └── zammad_service
+├── static
+│   └── js
+│       ├── rrhh_excel.js
+│       ├── rrhh_formulario.js
+│       ├── rrhh_globales.js
+│       └── rrhh_solicitudes.js
 └── storage
     ├── pdfs
     └── qrs
-(venv) 
-
 
     ⚙️ Guía de Modos de Ejecución (Entornos de Red / Configuración)
-Modo Dummy (Desarrollo / Testing local):
-
+Modo Dummy (Desarrollo / Testing local)
 Carga servicios/APIs simulados para pruebas locales sin impacto en el entorno productivo.
 
-Comando: uvicorn main:app --reload --reload-dir src (o definiendo DUMMY=true / MODE=development en variables de entorno).
+uvicorn main:app --reload --reload-dir src
 
-Modo Real (Integración / Producción):
-
+Modo Real (Integración / Producción)
 Conecta con los servicios, base de datos y APIs reales del sistema.
 
-En desarrollo local con backend real:
+Linux/macOS:
 
-Linux/macOS: MODE=production uvicorn main:app --reload --reload-dir src
+MODE=production uvicorn main:app --reload --reload-dir src
 
-Windows (PowerShell): $env:MODE="production"; uvicorn main:app --reload --reload-dir src
+Windows (PowerShell):
 
-Windows (CMD): set MODE=production && uvicorn main:app --reload --reload-dir src
+$env:MODE="production"; uvicorn main:app --reload --reload-dir src
+
+Windows (CMD):
+
+set MODE=production && uvicorn main:app --reload --reload-dir src
 
 En servidor de Producción:
 
-uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4 (sin --reload para óptimo rendimiento).
+uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
 
 Nota de Configuración: Las llamadas y comportamiento de la API se conmutan mediante variables definidas en .env (ej. DUMMY_MODE=false o APP_ENV=production).
