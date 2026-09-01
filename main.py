@@ -4,6 +4,7 @@ ARCHIVO: main.py
 DESCRIPCIÓN: Punto de entrada principal de la aplicación FastAPI.
 Maneja:
  - Inicialización de la App y creación de tablas en la Base de Datos.
+ - Montaje de archivos estáticos (JS/CSS).
  - Configuración Middleware de CORS.
  - Vistas HTML de navegación (Login, RRHH y Sistemas).
  - Endpoints generales (Login, Logout).
@@ -14,6 +15,7 @@ Maneja:
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -34,6 +36,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# --- ARCHIVOS ESTÁTICOS Y PLANTILLAS ---
+# Montar la carpeta static para servir JS, CSS, etc.
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Configuración del directorio de plantillas en la raíz del proyecto
+templates = Jinja2Templates(directory="templates")
+
+
 # --- CONFIGURACIÓN DE CORS ---
 app.add_middleware(
     CORSMiddleware,
@@ -45,8 +55,6 @@ app.add_middleware(
 
 # Inclusión del router de solicitudes
 app.include_router(solicitudes_controller.router)
-
-templates = Jinja2Templates(directory="config/templates")
 
 
 # --- ESQUEMAS PYDANTIC ---

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RRHH - Solicitud de Altas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Librería XLSX para leer/crear archivos Excel desde el navegador -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .card-header-custom { background: #0066ff; color: white; font-weight: 600; }
+
+        /* Zona Drag & Drop */
+        .drop-zone {
+            border: 2px dashed #0066ff;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+            background-color: #f8fafc;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            background-color: #e6f0ff;
+            border-color: #0044cc;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-person-plus-fill me-2"></i>Portal RRHH</a>
+            <div class="d-flex align-items-center">
+                <span class="text-light me-3 small"><i class="bi bi-person-circle me-1"></i> Operador RRHH</span>
+                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid px-4 my-4">
+
+        <!-- Pestañas para elegir modo de carga -->
+        <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active fw-bold" id="tab-individual" data-bs-toggle="pill" data-bs-target="#panel-individual" type="button" role="tab">
+                    <i class="bi bi-person-plus me-1"></i> Alta Individual
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-bold" id="tab-masiva" data-bs-toggle="pill" data-bs-target="#panel-masiva" type="button" role="tab">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Carga Masiva (Excel)
+                </button>
+            </li>
+        </ul>
+
+        <div class="row g-4">
+            <!-- Columna Izquierda: Formularios -->
+            <div class="col-lg-5 col-12">
+                <div class="tab-content" id="pills-tabContent">
+
+                    <!-- TAB 1: FORMULARIO INDIVIDUAL -->
+                    <div class="tab-pane fade show active" id="panel-individual" role="tabpanel">
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-header card-header-custom p-3 rounded-top">
+                                <i class="bi bi-file-earmark-text me-2"></i>Solicitud de Alta de Nuevo Empleado
+                            </div>
+                            <div class="card-body p-4">
+                                <div id="alertMsg" class="alert d-none mb-3" role="alert"></div>
+
+                                <form id="altaForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Nombre</label>
+                                            <input type="text" id="nombre" class="form-control" placeholder="ej. Fabio" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Apellido</label>
+                                            <input type="text" id="apellido" class="form-control" placeholder="ej. Gomez" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">DNI</label>
+                                            <input type="text" id="dni" class="form-control" placeholder="ej. 40123456" required>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small text-muted fw-bold">Legajo</label>
+                                            <input type="text" id="legajo" class="form-control" placeholder="ej. 1339" required>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">Teléfono de Contacto</label>
+                                            <input type="tel" id="telefono" class="form-control" placeholder="ej. 11 1234-5678" required>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <div class="form-check form-switch bg-light p-2 ps-5 rounded border">
+                                                <input class="form-check-input" type="checkbox" id="esFueraNomina">
+                                                <label class="form-check-label fw-bold text-secondary small" for="esFueraNomina">
+                                                    Empleado Fuera de Nómina (Legajo autogenerado 7000+)
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">A quién reporta</label>
+                                            <input type="text" id="reporta_a" class="form-control" placeholder="ej. Juan Pérez (Gerente)" required>
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label small text-muted fw-bold">Perfil / Rol Asignado</label>
+                                            <select id="perfil_ad" class="form-select" required>
+                                                <option value="" selected disabled>Seleccionar perfil...</option>
+                                                <option value="Operador">Operador</option>
+                                                <option value="Administrativo">Administrativo</option>
+                                                <option value="Supervisión">Supervisión</option>
+                                                <option value="Gerencia">Gerencia</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-12 mt-4">
+                                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">
+                                                <i class="bi bi-send me-2"></i>Enviar Solicitud a IT
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAB 2: CARGA MASIVA (EXCEL / DRAG & DROP) -->
+                    <div class="tab-pane fade" id="panel-masiva" role="tabpanel">
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-header bg-dark text-white p-3 rounded-top d-flex justify-content-between align-items-center">
+                                <span class="fw-bold"><i class="bi bi-file-earmark-excel me-2"></i>Importación Masiva desde Excel</span>
+                                <button type="button" onclick="descargarPlantilla()" class="btn btn-sm btn-outline-light">
+                                    <i class="bi bi-download me-1"></i>Plantilla
+                                </button>
+                            </div>
+                            <div class="card-body p-4">
+                                <div id="alertMsgMasivo" class="alert d-none mb-3" role="alert"></div>
+
+                                <!-- Zona de Arrastre -->
+                                <div id="dropZone" class="drop-zone mb-3">
+                                    <i class="bi bi-cloud-arrow-up display-5 text-primary"></i>
+                                    <p class="fw-bold mb-1 mt-2">Arrastra tu archivo Excel aquí</p>
+                                    <span class="text-muted small">o haz clic para examinar desde tu equipo (.xlsx, .xls)</span>
+                                    <input type="file" id="fileInput" accept=".xlsx, .xls" class="d-none">
+                                </div>
+
+                                <div id="previewMasivo" class="d-none">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="small fw-bold text-secondary">Registros detectados: <strong id="cantRegistros">0</strong></span>
+                                        <button class="btn btn-sm btn-link text-danger p-0" onclick="limpiarExcel()"><i class="bi bi-trash"></i> Quitar</button>
+                                    </div>
+                                    <button id="btnProcesarMasivo" onclick="procesarCargaMasiva()" class="btn btn-primary w-100 py-2 fw-bold">
+                                        <i class="bi bi-upload me-2"></i>Procesar y Enviar a IT
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Tabla de Solicitudes Enviadas -->
+            <div class="col-lg-7 col-12">
+                <div class="card shadow-sm border-0 rounded-3">
+                    <div class="card-header bg-white p-3 d-flex justify-content-between align-items-center">
+                        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history me-2"></i>Mis Solicitudes Enviadas</h5>
+                        <div class="d-flex align-items-center gap-2">
+                            <button id="btnExportarSeleccionados" onclick="exportarSeleccionados()" class="btn btn-success btn-sm d-none">
+                                <i class="bi bi-file-earmark-excel me-1"></i> Exportar (<span id="cantSeleccionados">0</span>)
+                            </button>
+                            <button onclick="cargarMisSolicitudes()" class="btn btn-outline-secondary btn-sm" title="Actualizar lista">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3" style="width: 40px;">
+                                            <input class="form-check-input" type="checkbox" id="checkAll" onchange="toggleSelectAll(this)">
+                                        </th>
+                                        <th>#</th>
+                                        <th>Empleado</th>
+                                        <th>Legajo / Tel.</th>
+                                        <th>Reporta a</th>
+                                        <th>Perfil</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaMisSolicitudes">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 text-muted">Cargando historial...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL DE DETALLE DE CREDENCIALES APROBADAS -->
+    <div class="modal fade" id="modalVerCredencialesRRHH" tabindex="-1" aria-labelledby="modalVerCredencialesLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalVerCredencialesLabel"><i class="bi bi-folder-check me-2"></i>Información de Credenciales Procesadas</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Detalle de cuentas y accesos generados por el equipo de IT:</p>
+                    <div id="detalleCredencialesContent" class="row g-3">
+                        <div class="text-center py-4 text-muted">Cargando datos...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Librerías de Terceros -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Módulos JavaScript Propios (Mantener estrictamente este orden) -->
+    <script src="{{ url_for('static', path='js/rrhh_globales.js') }}"></script>
+    <script src="{{ url_for('static', path='js/rrhh_solicitudes.js') }}"></script>
+    <script src="{{ url_for('static', path='js/rrhh_formulario.js') }}"></script>
+    <script src="{{ url_for('static', path='js/rrhh_excel.js') }}"></script>
+</body>
+</html>
