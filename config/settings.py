@@ -6,6 +6,7 @@
 #  - Ruta base del proyecto y rutas a archivos CSV dummy para crosscheck.
 #  - Definición del dominio corporativo para casillas de correo.
 #  - Variables de entorno del sistema.
+#  - Listado estático de supervisores / reportantes habilitados.
 # ===================================================================
 
 import os
@@ -49,3 +50,14 @@ FORTINET_CSV_PATH: str = os.getenv(
     "FORTINET_CSV_PATH", 
     os.path.join(DUMMY_DB_DIR, "fortinet_usuarios.csv")
 )
+
+# ===================================================================
+# LISTADO DE SUPERVISORES / REPORTANTES HABILITADOS
+# ===================================================================
+SUPERVISORES_HABILITADOS = [
+    {"nombre": "Juan Pérez", "email": "juan.perez@tandemtech.com.ar", "rol": "Gerente de Operaciones"},
+    {"nombre": "María González", "email": "maria.gonzalez@tandemtech.com.ar", "rol": "Team Leader Contact Center"},
+    {"nombre": "Carlos Rodríguez", "email": "carlos.rodriguez@tandemtech.com.ar", "rol": "Planificador WFM"},
+    {"nombre": "Ana Martínez", "email": "ana.martinez@tandemtech.com.ar", "rol": "Supervisora Turno Mañana"},
+    {"nombre": "Lucas Gómez", "email": "lucas.gomez@tandemtech.com.ar", "rol": "Jefe de Sistemas"},
+]

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from src.models.solicitud import SolicitudAlta
 from src.services.gsheet_service import obtener_siguiente_usuario_fn
 from src.services.neo_service import neo_service
+from src.services.reportantes_service import buscar_reportantes_estaticos
 from src.services.solicitudes_export_service import exportar_solicitudes_excel_service
 from src.services.solicitudes_import_service import procesar_importacion_masiva_excel
 from src.services.solicitudes_workflow_service import (
@@ -51,6 +52,12 @@ class ExportarSchema(BaseModel):
 # ==========================================
 # ENDPOINTS API
 # ==========================================
+@router.get("/reportantes/buscar")
+def buscar_reportantes(q: str = ""):
+    """Devuelve coincidencias de correos/nombres de superiores almacenados en memoria."""
+    return buscar_reportantes_estaticos(query=q)
+
+
 @router.get("/siguiente-legajo-fn")
 def get_siguiente_legajo_fn():
     """Consulta el Google Sheet y devuelve el próximo ID disponible (>= 7000)."""
