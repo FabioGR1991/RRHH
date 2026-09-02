@@ -3,7 +3,7 @@
 # ===================================================================
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from src.core.generator import generar_credenciales_propuestas
 from src.services.neo_service.dummy_service import DummyNeoService
@@ -27,13 +27,17 @@ class Orchestrator:
     def __init__(self):
         self.neo_service = DummyNeoService()
 
-    async def prevalidar_solicitud(self, datos_solicitud: Dict[str, Any]) -> Dict[str, Any]:
+    async def prevalidar_solicitud(
+        self, 
+        datos_solicitud: Dict[str, Any], 
+        check_services: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Fase de Pre-Validación (Re-verificar disponibilidad / Preview).
-        Consulta la disponibilidad cruzada en la BD Dummy CSV de NeoTel.
+        Consulta la disponibilidad cruzada en los servicios reales/mocks y en NeoTel.
         """
-        # 1. Generar la propuesta de credenciales
-        propuesta = generar_credenciales_propuestas(datos_solicitud)
+        # 1. Generar la propuesta de credenciales usando los servicios de validación
+        propuesta = generar_credenciales_propuestas(datos_solicitud, check_services=check_services)
         
         # 2. Obtener el Legajo de la solicitud
         legajo_raw = (
@@ -78,12 +82,16 @@ class Orchestrator:
             "conflictos": conflictos
         }
 
-    async def ejecutar_alta_confirmada(self, datos_solicitud: Dict[str, Any]) -> Dict[str, Any]:
+    async def ejecutar_alta_confirmada(
+        self, 
+        datos_solicitud: Dict[str, Any], 
+        check_services: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Ejecución real / Simulación de la creación de cuentas al 'Confirmar y Ejecutar Alta'.
         """
-        # 1. Prevalidar disponibilidades
-        pre_check = await self.prevalidar_solicitud(datos_solicitud)
+        # 1. Prevalidar disponibilidades pasando servicios de verificación
+        pre_check = await self.prevalidar_solicitud(datos_solicitud, check_services=check_services)
         if not pre_check["valido"]:
             logger.warning(f"[ORCHESTRATOR] Intento de alta rechazado por conflictos: {pre_check['conflictos']}")
             return {

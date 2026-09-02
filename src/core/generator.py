@@ -2,7 +2,8 @@ import re
 import unicodedata
 import random
 import string
-from typing import Dict, List, Optional, Any
+import inspect
+from typing import Dict, List, Optional, Any, Set
 
 # Dominio corporativo predeterminado
 DEFAULT_DOMAIN = "tandemtech.com.ar"
@@ -93,53 +94,83 @@ def generar_password_segura(longitud: int = 10) -> str:
     return "".join(password)
 
 
+async def _check_existe_usuario(servicio: Any, usuario_o_email: str) -> bool:
+    """
+    Helper para invocar existe_usuario o usuario_existe sin importar si es async o sync.
+    """
+    metodo = getattr(servicio, 'existe_usuario', None) or getattr(servicio, 'usuario_existe', None)
+    if not metodo:
+        return False
+
+    if inspect.iscoroutinefunction(metodo):
+        return await metodo(usuario_o_email)
+    else:
+        return metodo(usuario_o_email)
+
+
 async def resolver_username_disponible(
     candidatos: List[str], 
-    check_services: Optional[Dict[str, Any]] = None
+    check_services: Optional[Dict[str, Any]] = None,
+    reservados_batch: Optional[Set[str]] = None
 ) -> str:
     """
     Itera sobre la lista de candidatos de username y consulta con los servicios 
-    (AD, Google, NeoTel, Fortinet) para encontrar el primero que esté 100% libre.
-    
-    `check_services` es un diccionario opcional con las instancias de servicios.
-    Si no se pasan servicios (modo dev/mock), devuelve el primer candidato.
+    (AD, Google, NeoTel, Fortinet) y la lista de reservados en el lote actual 
+    para encontrar el primero que esté 100% libre.
     """
-    if not candidatos:
-        return "usuario"
+    if reservados_batch is None:
+        reservados_batch = set()
 
-    if not check_services:
-        return candidatos[0]
+    if not candidatos:
+        candidato_base = "usuario"
+        if candidato_base not in reservados_batch:
+            reservados_batch.add(candidato_base)
+            return candidato_base
+        candidatos = [candidato_base]
 
     for username in candidatos:
+        # Verificar colisión en memoria con el lote/batch procesado previamente
+        if username in reservados_batch:
+            continue
+
         colision_detectada = False
 
-        # 1. Chequear Active Directory
-        if 'ad' in check_services and hasattr(check_services['ad'], 'existe_usuario'):
-            if await check_services['ad'].existe_usuario(username):
-                colision_detectada = True
+        if check_services:
+            # 1. Chequear Active Directory
+            if 'ad' in check_services and not colision_detectada:
+                if await _check_existe_usuario(check_services['ad'], username):
+                    colision_detectada = True
 
-        # 2. Chequear Google Workspace
-        if not colision_detectada and 'google' in check_services and hasattr(check_services['google'], 'existe_usuario'):
-            email_candidate = f"{username}@{DEFAULT_DOMAIN}"
-            if await check_services['google'].existe_usuario(email_candidate):
-                colision_detectada = True
+            # 2. Chequear Google Workspace
+            if 'google' in check_services and not colision_detectada:
+                email_candidate = f"{username}@{DEFAULT_DOMAIN}"
+                if await _check_existe_usuario(check_services['google'], email_candidate):
+                    colision_detectada = True
 
-        # 3. Chequear NeoTel (Telemarketer)
-        if not colision_detectada and 'neotel' in check_services and hasattr(check_services['neotel'], 'existe_usuario'):
-            if await check_services['neotel'].existe_usuario(username):
-                colision_detectada = True
+            # 3. Chequear NeoTel (Telemarketer)
+            if 'neotel' in check_services and not colision_detectada:
+                if await _check_existe_usuario(check_services['neotel'], username):
+                    colision_detectada = True
 
-        # 4. Chequear FortiGate VPN
-        if not colision_detectada and 'fortinet' in check_services and hasattr(check_services['fortinet'], 'existe_usuario'):
-            if await check_services['fortinet'].existe_usuario(username):
-                colision_detectada = True
+            # 4. Chequear FortiGate VPN
+            if 'fortinet' in check_services and not colision_detectada:
+                if await _check_existe_usuario(check_services['fortinet'], username):
+                    colision_detectada = True
 
-        # Si ningún sistema detectó colisión, este username es el libre
+        # Si ningún sistema ni el batch detectaron colisión, este username está disponible
         if not colision_detectada:
+            reservados_batch.add(username)
             return username
 
-    # Si todos los candidatos colisionaron, agregar sufijo numérico aleatorio
-    return f"{candidatos[0]}{random.randint(100, 999)}"
+    # Fallback si todos los candidatos colisionaron: agregar número correlativo no usado en el batch
+    base = candidatos[0]
+    i = 1
+    while True:
+        candidate = f"{base}{i}"
+        if candidate not in reservados_batch:
+            reservados_batch.add(candidate)
+            return candidate
+        i += 1
 
 
 async def generar_preview_credenciales(
@@ -149,14 +180,19 @@ async def generar_preview_credenciales(
     legajo: str,
     perfil: str,
     reporta_a: str,
-    check_services: Optional[Dict[str, Any]] = None
+    check_services: Optional[Dict[str, Any]] = None,
+    reservados_batch: Optional[Set[str]] = None
 ) -> Dict[str, Any]:
     """
     Genera el JSON completo de Previsualización de Credenciales
     para que IT lo revise y apruebe en el dashboard antes de la ejecución real.
     """
     candidatos = generar_usernames_candidatos(nombre, apellido)
-    username_elegido = await resolver_username_disponible(candidatos, check_services)
+    username_elegido = await resolver_username_disponible(
+        candidatos, 
+        check_services=check_services, 
+        reservados_batch=reservados_batch
+    )
 
     email = f"{username_elegido}@{DEFAULT_DOMAIN}"
     legajo_neotel = transformar_legajo_neotel(legajo)
@@ -201,10 +237,52 @@ async def generar_preview_credenciales(
                 "nat": "yes"
             },
             "forticlient": {
-    "username": nombre_completo_posicion,  # Cambiado de username_elegido a NombreApellido (ej. FabioGomez)
-    "password_temp": dni,
-    "email_2fa": email,
-    "grupo_vpn": "VPN_Usuarios_remotos"
-}
+                "username": nombre_completo_posicion,
+                "password_temp": dni,
+                "email_2fa": email,
+                "grupo_vpn": "VPN_Usuarios_remotos"
+            }
         }
     }
+
+
+def generar_credenciales_propuestas(
+    datos_solicitud: Dict[str, Any], 
+    check_services: Optional[Dict[str, Any]] = None,
+    reservados_batch: Optional[Set[str]] = None
+) -> Dict[str, Any]:
+    """
+    Wrapper sincrónico / helper utilizado por el Orquestador o procesadores en lote.
+    """
+    import asyncio
+    
+    nombre = datos_solicitud.get("nombre", "")
+    apellido = datos_solicitud.get("apellido", "")
+    dni = str(datos_solicitud.get("dni", ""))
+    legajo = str(datos_solicitud.get("legajo", datos_solicitud.get("legajo_rrhh", "")))
+    perfil = datos_solicitud.get("perfil", datos_solicitud.get("puesto", ""))
+    reporta_a = datos_solicitud.get("reporta_a", "")
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Si se invoca dentro de un contexto asincrónico activo
+            import nest_asyncio
+            nest_asyncio.apply()
+            return loop.run_until_complete(
+                generar_preview_credenciales(
+                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+                )
+            )
+        else:
+            return loop.run_until_complete(
+                generar_preview_credenciales(
+                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+                )
+            )
+    except RuntimeError:
+        return asyncio.run(
+            generar_preview_credenciales(
+                nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+            )
+        )
