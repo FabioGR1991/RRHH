@@ -57,7 +57,7 @@ class ExportarSchema(BaseModel):
 
 
 # ==========================================
-# FUNCIONES AUXILIARES (GOOGLE SHEETS)
+# FUNCIONES AUXILIARES (GOOGLE SHEETS & LOGIC)
 # ==========================================
 def obtener_siguiente_usuario_fn() -> int:
     """Descarga el CSV del Google Sheet 'FUERA DE NOMINA', busca el mayor
@@ -92,6 +92,19 @@ def obtener_siguiente_usuario_fn() -> int:
         return 7345
 
 
+def obtener_usuario_neotel_desde_legajo(legajo: str) -> str:
+    """Regla de Negocio NeoTel:
+    Transforma el Legajo reemplazando el primer caracter '1' por '3'.
+    Ejemplo: '1005' -> '3005'. Si no empieza con '1', antepone '3'.
+    """
+    legajo_str = str(legajo).strip()
+    if not legajo_str:
+        return ""
+    if legajo_str.startswith("1"):
+        return "3" + legajo_str[1:]
+    return "3" + legajo_str
+
+
 # ==========================================
 # ENDPOINTS API
 # ==========================================
@@ -112,6 +125,8 @@ def listar_solicitudes(db: Session = Depends(get_db)):
 @router.post("")
 def crear_solicitud(solicitud: SolicitudCreate, db: Session = Depends(get_db)):
     """Crea una nueva solicitud individual enviada por RRHH."""
+    
+    # 1. Validación en BD SQL Local
     existe = (
         db.query(SolicitudAlta)
         .filter(
@@ -123,9 +138,21 @@ def crear_solicitud(solicitud: SolicitudCreate, db: Session = Depends(get_db)):
 
     if existe:
         raise HTTPException(
-            status_code=400, detail="El DNI o Legajo ya se encuentra registrado."
+            status_code=400, detail="El DNI o Legajo ya se encuentra registrado en el sistema."
         )
 
+    # 2. Validación en la base CSV de NeoTel (Crosscheck)
+    check_neo = neo_service.legajo_o_dni_existe(solicitud.legajo, solicitud.dni)
+    if check_neo["existe_legajo"]:
+        raise HTTPException(
+            status_code=400, detail=f"El Legajo {solicitud.legajo} ya existe en la base de NeoTel."
+        )
+    if check_neo["existe_dni"]:
+        raise HTTPException(
+            status_code=400, detail=f"El DNI {solicitud.dni} ya existe en la base de NeoTel."
+        )
+
+    # 3. Creación de la solicitud
     nueva_solicitud = SolicitudAlta(
         nombre=solicitud.nombre,
         apellido=solicitud.apellido,
@@ -304,14 +331,14 @@ async def obtener_preview_solicitud(
     }
 
     preview_full = await generar_preview_credenciales(
-        nombre=solicitud.nombre,
-        apellido=solicitud.apellido,
-        dni=solicitud.dni,
-        legajo=solicitud.legajo,
-        perfil=solicitud.perfil_ad,
-        reporta_a=solicitud.reporta_a,
-        check_services=check_services,
-    )
+    nombre=solicitud.nombre,
+    apellido=solicitud.apellido,
+    dni=solicitud.dni,
+    legajo=solicitud.legajo,
+    perfil=solicitud.perfil_ad,
+    reporta_a=solicitud.reporta_a,
+    check_services=check_services,
+)
 
     propuesta = preview_full["propuesta_credenciales"]
 
@@ -326,6 +353,7 @@ async def obtener_preview_solicitud(
         "posicion_xlite": propuesta["neotel"]["posicion_user"],
         "clave_xlite": propuesta["neotel"]["posicion_pass"],
         "es_fuera_de_nomina": solicitud.es_fuera_de_nomina,
+        "validaciones": preview_full.get("validaciones", {})
     }
 
 
@@ -355,15 +383,28 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
     }
 
     preview_full = await generar_preview_credenciales(
-        nombre=solicitud.nombre,
-        apellido=solicitud.apellido,
-        dni=solicitud.dni,
-        legajo=solicitud.legajo,
-        perfil=solicitud.perfil_ad,
-        reporta_a=solicitud.reporta_a,
-        check_services=check_services,
-    )
+    nombre=solicitud.nombre,
+    apellido=solicitud.apellido,
+    dni=solicitud.dni,
+    legajo=solicitud.legajo,
+    perfil=solicitud.perfil_ad,
+    reporta_a=solicitud.reporta_a,
+    check_services=check_services,
+)
     creds = preview_full["propuesta_credenciales"]
+
+    # Preparar payload extendido con mapeo de Legajo -> Usuario NeoTel (3xxx)
+    usuario_neo_calculado = creds["neotel"].get("telemarketer_user") or obtener_usuario_neotel_desde_legajo(solicitud.legajo)
+    
+    payload_neotel = dict(creds["neotel"])
+    payload_neotel.update({
+        "usuario": usuario_neo_calculado,
+        "legajo_neo": usuario_neo_calculado,
+        "legajo": solicitud.legajo,
+        "nombre": solicitud.nombre,
+        "apellido": solicitud.apellido,
+        "nombre_apellido": f"{solicitud.nombre} {solicitud.apellido}".strip()
+    })
 
     try:
         if not solicitud.es_fuera_de_nomina:
@@ -371,13 +412,13 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
             await crear_casilla_google(creds["google_workspace"])
             await crear_usuario_fortinet(creds["forticlient"])
 
-        await crear_usuario_neotel(creds["neotel"])
+        await crear_usuario_neotel(payload_neotel)
     except Exception as e:
         logger.error(
             f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}: {e}"
         )
         raise HTTPException(
-            status_code=500, detail=f"Error al aprovisionar cuentas: {str(e)}"
+            status_code=500, detail=f"Fallo en aprovisionamiento de servicios para solicitud #{solicitud_id}: {str(e)}"
         )
 
     datos_solicitud_dict = {
@@ -466,54 +507,54 @@ async def exportar_solicitudes_excel(
 
     for s in solicitudes:
         preview_full = await generar_preview_credenciales(
-            nombre=s.nombre,
-            apellido=s.apellido,
-            dni=s.dni,
-            legajo=s.legajo,
-            perfil=s.perfil_ad,
-            reporta_a=s.reporta_a,
-            check_services=check_services,
-        )
+    nombre=solicitud.nombre,
+    apellido=solicitud.apellido,
+    dni=solicitud.dni,
+    legajo=solicitud.legajo,
+    perfil=solicitud.perfil_ad,
+    reporta_a=solicitud.reporta_a,
+    check_services=check_services,
+)
         creds = preview_full["propuesta_credenciales"]
 
         filas.append({
-    "Mail": (
-        creds["google_workspace"]["email"]
-        if not s.es_fuera_de_nomina
-        else "-"
-    ),
-    "Clave Mail": (
-        creds["google_workspace"]["password_temp"]
-        if not s.es_fuera_de_nomina
-        else "-"
-    ),
-    "Nro. Cel": s.telefono if getattr(s, "telefono", None) else "-",  # 👈 Mapeo dinámico del celular
-    "Usuario AD": (
-        creds["active_directory"]["username"]
-        if not s.es_fuera_de_nomina
-        else "-"
-    ),
-    "Clave AD": (
-        creds["active_directory"]["password_temp"]
-        if not s.es_fuera_de_nomina
-        else "-"
-    ),
-    "Usuario Fortinet (VPN 100 F)": (
-        creds["forticlient"]["username"] if not s.es_fuera_de_nomina else "-"
-    ),
-    "Clave Fortinet (DNI)": (
-        creds["forticlient"]["password_temp"]
-        if not s.es_fuera_de_nomina
-        else "-"
-    ),
-    "USUARIO NEO": creds["neotel"]["telemarketer_user"],
-    "CLAVE 9": f"9{creds['neotel']['telemarketer_user']}",
-    "NOMBRE": s.nombre.title(),
-    "APELLIDO": s.apellido.title(),
-    "Dispositivo posición (X-Lite)": creds["neotel"]["posicion_user"],
-    "CLAVE": creds["neotel"]["posicion_pass"],
-    "Superior": s.reporta_a,
-})
+            "Mail": (
+                creds["google_workspace"]["email"]
+                if not s.es_fuera_de_nomina
+                else "-"
+            ),
+            "Clave Mail": (
+                creds["google_workspace"]["password_temp"]
+                if not s.es_fuera_de_nomina
+                else "-"
+            ),
+            "Nro. Cel": s.telefono if getattr(s, "telefono", None) else "-",
+            "Usuario AD": (
+                creds["active_directory"]["username"]
+                if not s.es_fuera_de_nomina
+                else "-"
+            ),
+            "Clave AD": (
+                creds["active_directory"]["password_temp"]
+                if not s.es_fuera_de_nomina
+                else "-"
+            ),
+            "Usuario Fortinet (VPN 100 F)": (
+                creds["forticlient"]["username"] if not s.es_fuera_de_nomina else "-"
+            ),
+            "Clave Fortinet (DNI)": (
+                creds["forticlient"]["password_temp"]
+                if not s.es_fuera_de_nomina
+                else "-"
+            ),
+            "USUARIO NEO": creds["neotel"]["telemarketer_user"],
+            "CLAVE 9": f"9{creds['neotel']['telemarketer_user']}",
+            "NOMBRE": s.nombre.title(),
+            "APELLIDO": s.apellido.title(),
+            "Dispositivo posición (X-Lite)": creds["neotel"]["posicion_user"],
+            "CLAVE": creds["neotel"]["posicion_pass"],
+            "Superior": s.reporta_a,
+        })
     df = pd.DataFrame(filas)
 
     output = io.BytesIO()
