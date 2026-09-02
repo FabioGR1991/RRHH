@@ -3,7 +3,7 @@
 # ===================================================================
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set
 
 from src.core.generator import generar_credenciales_propuestas
 from src.services.neo_service.dummy_service import DummyNeoService
@@ -30,14 +30,19 @@ class Orchestrator:
     async def prevalidar_solicitud(
         self, 
         datos_solicitud: Dict[str, Any], 
-        check_services: Optional[Dict[str, Any]] = None
+        check_services: Optional[Dict[str, Any]] = None,
+        reservados_batch: Optional[Set[str]] = None
     ) -> Dict[str, Any]:
         """
         Fase de Pre-Validación (Re-verificar disponibilidad / Preview).
         Consulta la disponibilidad cruzada en los servicios reales/mocks y en NeoTel.
         """
-        # 1. Generar la propuesta de credenciales usando los servicios de validación
-        propuesta = generar_credenciales_propuestas(datos_solicitud, check_services=check_services)
+        # 1. Generar la propuesta de credenciales conservando el estado del lote
+        propuesta = generar_credenciales_propuestas(
+            datos_solicitud, 
+            check_services=check_services, 
+            reservados_batch=reservados_batch
+        )
         
         # 2. Obtener el Legajo de la solicitud
         legajo_raw = (
@@ -85,13 +90,18 @@ class Orchestrator:
     async def ejecutar_alta_confirmada(
         self, 
         datos_solicitud: Dict[str, Any], 
-        check_services: Optional[Dict[str, Any]] = None
+        check_services: Optional[Dict[str, Any]] = None,
+        reservados_batch: Optional[Set[str]] = None
     ) -> Dict[str, Any]:
         """
         Ejecución real / Simulación de la creación de cuentas al 'Confirmar y Ejecutar Alta'.
         """
-        # 1. Prevalidar disponibilidades pasando servicios de verificación
-        pre_check = await self.prevalidar_solicitud(datos_solicitud, check_services=check_services)
+        # 1. Prevalidar disponibilidades pasando servicios de verificación y el lote reservado
+        pre_check = await self.prevalidar_solicitud(
+            datos_solicitud, 
+            check_services=check_services, 
+            reservados_batch=reservados_batch
+        )
         if not pre_check["valido"]:
             logger.warning(f"[ORCHESTRATOR] Intento de alta rechazado por conflictos: {pre_check['conflictos']}")
             return {

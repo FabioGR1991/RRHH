@@ -111,26 +111,34 @@ async def _check_existe_usuario(servicio: Any, usuario_o_email: str) -> bool:
 async def resolver_username_disponible(
     candidatos: List[str], 
     check_services: Optional[Dict[str, Any]] = None,
-    reservados_batch: Optional[Set[str]] = None
+    reservados_batch: Optional[Set[str]] = None,
+    usernames_db_pendientes: Optional[Set[str]] = None
 ) -> str:
     """
     Itera sobre la lista de candidatos de username y consulta con los servicios 
-    (AD, Google, NeoTel, Fortinet) y la lista de reservados en el lote actual 
-    para encontrar el primero que esté 100% libre.
+    (AD, Google, NeoTel, Fortinet), la lista de reservados en el lote actual 
+    y los usernames de solicitudes pendientes en la BD para encontrar el primero libre.
     """
     if reservados_batch is None:
         reservados_batch = set()
 
+    if usernames_db_pendientes is None:
+        usernames_db_pendientes = set()
+
     if not candidatos:
         candidato_base = "usuario"
-        if candidato_base not in reservados_batch:
+        if candidato_base not in reservados_batch and candidato_base not in usernames_db_pendientes:
             reservados_batch.add(candidato_base)
             return candidato_base
         candidatos = [candidato_base]
 
     for username in candidatos:
-        # Verificar colisión en memoria con el lote/batch procesado previamente
+        # 1. Verificar colisión en memoria con el lote/batch procesado previamente
         if username in reservados_batch:
+            continue
+
+        # 2. Verificar colisión contra solicitudes PENDIENTES reservadas en BD
+        if username in usernames_db_pendientes:
             continue
 
         colision_detectada = False
@@ -157,17 +165,17 @@ async def resolver_username_disponible(
                 if await _check_existe_usuario(check_services['fortinet'], username):
                     colision_detectada = True
 
-        # Si ningún sistema ni el batch detectaron colisión, este username está disponible
+        # Si ningún sistema, el batch ni la BD detectaron colisión, este username está disponible
         if not colision_detectada:
             reservados_batch.add(username)
             return username
 
-    # Fallback si todos los candidatos colisionaron: agregar número correlativo no usado en el batch
+    # Fallback si todos los candidatos colisionaron: agregar número correlativo
     base = candidatos[0]
     i = 1
     while True:
         candidate = f"{base}{i}"
-        if candidate not in reservados_batch:
+        if candidate not in reservados_batch and candidate not in usernames_db_pendientes:
             reservados_batch.add(candidate)
             return candidate
         i += 1
@@ -181,7 +189,8 @@ async def generar_preview_credenciales(
     perfil: str,
     reporta_a: str,
     check_services: Optional[Dict[str, Any]] = None,
-    reservados_batch: Optional[Set[str]] = None
+    reservados_batch: Optional[Set[str]] = None,
+    usernames_db_pendientes: Optional[Set[str]] = None
 ) -> Dict[str, Any]:
     """
     Genera el JSON completo de Previsualización de Credenciales
@@ -191,7 +200,8 @@ async def generar_preview_credenciales(
     username_elegido = await resolver_username_disponible(
         candidatos, 
         check_services=check_services, 
-        reservados_batch=reservados_batch
+        reservados_batch=reservados_batch,
+        usernames_db_pendientes=usernames_db_pendientes
     )
 
     email = f"{username_elegido}@{DEFAULT_DOMAIN}"
@@ -249,7 +259,8 @@ async def generar_preview_credenciales(
 def generar_credenciales_propuestas(
     datos_solicitud: Dict[str, Any], 
     check_services: Optional[Dict[str, Any]] = None,
-    reservados_batch: Optional[Set[str]] = None
+    reservados_batch: Optional[Set[str]] = None,
+    usernames_db_pendientes: Optional[Set[str]] = None # <-- NUEVO PARÁMETRO
 ) -> Dict[str, Any]:
     """
     Wrapper sincrónico / helper utilizado por el Orquestador o procesadores en lote.
@@ -266,23 +277,22 @@ def generar_credenciales_propuestas(
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # Si se invoca dentro de un contexto asincrónico activo
             import nest_asyncio
             nest_asyncio.apply()
             return loop.run_until_complete(
                 generar_preview_credenciales(
-                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch, usernames_db_pendientes
                 )
             )
         else:
             return loop.run_until_complete(
                 generar_preview_credenciales(
-                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+                    nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch, usernames_db_pendientes
                 )
             )
     except RuntimeError:
         return asyncio.run(
             generar_preview_credenciales(
-                nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch
+                nombre, apellido, dni, legajo, perfil, reporta_a, check_services, reservados_batch, usernames_db_pendientes
             )
         )

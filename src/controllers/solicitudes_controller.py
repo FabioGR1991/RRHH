@@ -19,7 +19,7 @@ from pydantic import BaseModel
 import requests
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from src.core.generator import generar_preview_credenciales
+from src.core.generator import generar_preview_credenciales, sanitizar_string
 from src.models.solicitud import SolicitudAlta
 from src.services.ad_service import ad_service, crear_usuario_ad
 from src.services.email_service import enviar_notificacion_alta
@@ -103,6 +103,34 @@ def obtener_usuario_neotel_desde_legajo(legajo: str) -> str:
     if legajo_str.startswith("1"):
         return "3" + legajo_str[1:]
     return "3" + legajo_str
+
+
+def obtener_usernames_pendientes_db(db: Session, solicitud_id_actual: Optional[int] = None) -> set:
+    """Consulta la BD buscando solicitudes anteriores o pendientes para extraer los usernames
+    ya asignados o previstos y evitar colisiones al generar nuevas credenciales.
+    """
+    query = db.query(SolicitudAlta)
+    if solicitud_id_actual:
+        query = query.filter(SolicitudAlta.id < solicitud_id_actual)
+    
+    solicitudes_anteriores = query.filter(
+        SolicitudAlta.estado.in_(["PENDIENTE", "EN_PROCESO", "COMPLETADO", "PROCESADO"])
+    ).all()
+
+    usernames_db = set()
+    for s in solicitudes_anteriores:
+        if hasattr(s, 'propuesta_json') and s.propuesta_json:
+            un = s.propuesta_json.get("propuesta_credenciales", {}).get("active_directory", {}).get("username")
+            if un:
+                usernames_db.add(un)
+        else:
+            nom_l = sanitizar_string(s.nombre)
+            ape_l = sanitizar_string(s.apellido)
+            if nom_l and ape_l:
+                p_nombre = nom_l.split()[0] if " " in nom_l else nom_l
+                usernames_db.add(f"{p_nombre[0]}{ape_l}")
+
+    return usernames_db
 
 
 # ==========================================
@@ -218,6 +246,11 @@ async def cargar_solicitudes_masiva(
     exitos = 0
     errores = []
 
+    # 1. SETS EN MEMORIA PARA CONTROLAR DUPLICADOS EN EL MISMO EXCEL
+    reservados_batch = set()  # Para usernames/credenciales (si generas preview)
+    dnis_en_lote = set()      # Evita que el mismo Excel traiga DNI duplicado
+    legajos_en_lote = set()   # Evita que el mismo Excel traiga Legajo duplicado
+
     for idx, row in df.iterrows():
         num_fila = idx + 2
 
@@ -254,17 +287,30 @@ async def cargar_solicitudes_masiva(
 
         if not nombre or not apellido or not dni or not legajo:
             errores.append(
-                f"Fila {num_fila}: Datos incompletos (Nombre, Apellido, DNI y Legajo"
-                " son obligatorios)."
+                f"Fila {num_fila}: Datos incompletos (Nombre, Apellido, DNI y Legajo son obligatorios)."
             )
             continue
 
+        # 2. VALIDAR SI EL DNI O LEGAJO YA VIENEN DUPLICADOS EN FILAS ANTERIORES DEL MISMO EXCEL
+        if dni in dnis_en_lote:
+            errores.append(
+                f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} está duplicado dentro de este mismo Excel."
+            )
+            continue
+
+        if legajo in legajos_en_lote:
+            errores.append(
+                f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} está duplicado dentro de este mismo Excel."
+            )
+            continue
+
+        # 3. VALIDAR CONTRA BASE DE DATOS EXISTENTE
         existe_dni = (
             db.query(SolicitudAlta).filter(SolicitudAlta.dni == dni).first()
         )
         if existe_dni:
             errores.append(
-                f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} ya está registrado."
+                f"Fila {num_fila} ({nombre} {apellido}): El DNI {dni} ya está registrado en el sistema."
             )
             continue
 
@@ -273,9 +319,13 @@ async def cargar_solicitudes_masiva(
         )
         if existe_legajo:
             errores.append(
-                f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} ya está registrado."
+                f"Fila {num_fila} ({nombre} {apellido}): El Legajo {legajo} ya está registrado en el sistema."
             )
             continue
+
+        # 4. RESERVAR EN MEMORIA PARA LAS SIGUIENTES FILAS
+        dnis_en_lote.add(dni)
+        legajos_en_lote.add(legajo)
 
         nueva_solicitud = SolicitudAlta(
             nombre=nombre,
@@ -330,15 +380,19 @@ async def obtener_preview_solicitud(
         "fortinet": fortinet_service,
     }
 
+    # Obtener usernames de solicitudes previas/pendientes en BD
+    usernames_db_pendientes = obtener_usernames_pendientes_db(db, solicitud_id_actual=solicitud_id)
+
     preview_full = await generar_preview_credenciales(
-    nombre=solicitud.nombre,
-    apellido=solicitud.apellido,
-    dni=solicitud.dni,
-    legajo=solicitud.legajo,
-    perfil=solicitud.perfil_ad,
-    reporta_a=solicitud.reporta_a,
-    check_services=check_services,
-)
+        nombre=solicitud.nombre,
+        apellido=solicitud.apellido,
+        dni=solicitud.dni,
+        legajo=solicitud.legajo,
+        perfil=solicitud.perfil_ad,
+        reporta_a=solicitud.reporta_a,
+        check_services=check_services,
+        usernames_db_pendientes=usernames_db_pendientes,
+    )
 
     propuesta = preview_full["propuesta_credenciales"]
 
@@ -382,15 +436,19 @@ async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
         "fortinet": fortinet_service,
     }
 
+    # Obtener usernames de solicitudes previas/pendientes en BD
+    usernames_db_pendientes = obtener_usernames_pendientes_db(db, solicitud_id_actual=solicitud_id)
+
     preview_full = await generar_preview_credenciales(
-    nombre=solicitud.nombre,
-    apellido=solicitud.apellido,
-    dni=solicitud.dni,
-    legajo=solicitud.legajo,
-    perfil=solicitud.perfil_ad,
-    reporta_a=solicitud.reporta_a,
-    check_services=check_services,
-)
+        nombre=solicitud.nombre,
+        apellido=solicitud.apellido,
+        dni=solicitud.dni,
+        legajo=solicitud.legajo,
+        perfil=solicitud.perfil_ad,
+        reporta_a=solicitud.reporta_a,
+        check_services=check_services,
+        usernames_db_pendientes=usernames_db_pendientes,
+    )
     creds = preview_full["propuesta_credenciales"]
 
     # Preparar payload extendido con mapeo de Legajo -> Usuario NeoTel (3xxx)
@@ -504,17 +562,25 @@ async def exportar_solicitudes_excel(
     }
 
     filas = []
+    
+    # Conjunto para retener y reservar usuarios durante el procesamiento del lote en memoria
+    usuarios_reservados = set()
 
     for s in solicitudes:
+        # Obtener usernames de solicitudes previas/pendientes en BD para evitar solapamientos
+        usernames_db_pendientes = obtener_usernames_pendientes_db(db, solicitud_id_actual=s.id)
+
         preview_full = await generar_preview_credenciales(
-    nombre=solicitud.nombre,
-    apellido=solicitud.apellido,
-    dni=solicitud.dni,
-    legajo=solicitud.legajo,
-    perfil=solicitud.perfil_ad,
-    reporta_a=solicitud.reporta_a,
-    check_services=check_services,
-)
+            nombre=s.nombre,
+            apellido=s.apellido,
+            dni=s.dni,
+            legajo=s.legajo,
+            perfil=s.perfil_ad,
+            reporta_a=s.reporta_a,
+            check_services=check_services,
+            reservados_batch=usuarios_reservados,
+            usernames_db_pendientes=usernames_db_pendientes,
+        )
         creds = preview_full["propuesta_credenciales"]
 
         filas.append({

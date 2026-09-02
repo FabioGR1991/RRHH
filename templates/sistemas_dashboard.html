@@ -81,6 +81,8 @@ Maneja:
                 <div class="modal-body">
                     <p class="text-muted small">Revise la propuesta generada automáticamente antes de confirmar el alta en los sistemas:</p>
                     
+                    <div id="modalAlert" class="alert alert-danger d-none mb-3" role="alert"></div>
+
                     <div id="previewContent" class="row g-3">
                         <!-- Se llena dinámicamente con JavaScript -->
                         <div class="text-center py-4 text-muted">Generando preview...</div>
@@ -142,7 +144,7 @@ Maneja:
                 const tbody = document.getElementById('tablaSolicitudes');
                 tbody.innerHTML = '';
 
-                if (data.length === 0) {
+                if (!Array.isArray(data) || data.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No hay solicitudes registradas aún.</td></tr>`;
                     return;
                 }
@@ -180,11 +182,19 @@ Maneja:
         async function abrirPreview(id, abrirModal = true) {
             document.getElementById('solicitudIdActual').value = id;
             const container = document.getElementById('previewContent');
+            const alertBox = document.getElementById('modalAlert');
+            
+            alertBox.classList.add('d-none');
+            alertBox.innerText = '';
             container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Calculando datos y consultando disponibilidad...</div>`;
             
             if (abrirModal) {
-                const myModal = new bootstrap.Modal(document.getElementById('modalPreview'));
-                myModal.show();
+                const modalEl = document.getElementById('modalPreview');
+                let modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (!modalInstance) {
+                    modalInstance = new bootstrap.Modal(modalEl);
+                }
+                modalInstance.show();
             }
 
             try {
@@ -275,35 +285,52 @@ Maneja:
 
         async function confirmarAlta() {
             const id = document.getElementById('solicitudIdActual').value;
-            const btn = document.getElementById('btnConfirmarAlta');
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando Alta...`;
+            const btnConfirmar = document.getElementById('btnConfirmarAlta');
+            const btnRecalcular = document.getElementById('btnRecalcular');
+            const alertBox = document.getElementById('modalAlert');
+
+            btnConfirmar.disabled = true;
+            btnRecalcular.disabled = true;
+            btnConfirmar.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando Alta...`;
 
             try {
                 const response = await fetch(`/api/solicitudes/${id}/aprobar`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 const data = await response.json();
 
-                // Cerrar modal de preview
-                const modalEl = document.getElementById('modalPreview');
-                const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                if (modalInstance) modalInstance.hide();
+                // Detección de colisión / conflicto (HTTP 409 Conflict)
+                if (response.status === 409) {
+                    alertBox.innerText = `Conflicto de duplicidad detectado: ${data.detail || 'Las credenciales ya han sido asignadas'}. Recalculando nueva propuesta...`;
+                    alertBox.classList.remove('d-none');
+                    
+                    // Se re-ejecuta la previsualización en segundo plano para traer credenciales libres
+                    await abrirPreview(id, false);
+                    return;
+                }
 
                 if (response.ok) {
-                    // Desplegar Modal de Output con credenciales procesadas
-                    mostrarModalOutput(previewActualCache);
+                    // Cerrar modal de preview
+                    const modalEl = document.getElementById('modalPreview');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInstance) modalInstance.hide();
+
+                    // Si el backend devuelve las credenciales finales en la respuesta, usamos esa fuente de verdad
+                    const credencialesFinales = (data && data.credenciales) ? data.credenciales : previewActualCache;
+                    mostrarModalOutput(credencialesFinales);
                 } else {
-                    alert('Error al procesar: ' + (data.detail || 'Desconocido'));
-                    cargarSolicitudes();
+                    alertBox.innerText = 'Error al procesar: ' + (data.detail || 'Error desconocido');
+                    alertBox.classList.remove('d-none');
                 }
             } catch (err) {
-                alert('Error de conexión con el servidor');
-                cargarSolicitudes();
+                alertBox.innerText = 'Error de conexión con el servidor al procesar el alta.';
+                alertBox.classList.remove('d-none');
             } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta`;
+                btnConfirmar.disabled = false;
+                btnRecalcular.disabled = false;
+                btnConfirmar.innerHTML = `<i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta`;
             }
         }
 
@@ -355,7 +382,11 @@ Maneja:
 
             document.getElementById('outputTextoFormateado').value = textoResumen;
             
-            const modalOutput = new bootstrap.Modal(document.getElementById('modalOutputCredenciales'));
+            const modalOutputEl = document.getElementById('modalOutputCredenciales');
+            let modalOutput = bootstrap.Modal.getInstance(modalOutputEl);
+            if (!modalOutput) {
+                modalOutput = new bootstrap.Modal(modalOutputEl);
+            }
             modalOutput.show();
         }
 
