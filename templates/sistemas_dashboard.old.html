@@ -1,0 +1,405 @@
+<!-- ===================================================================
+ARCHIVO: config/templates/sistemas_dashboard.html
+DESCRIPCIÓN: Panel de control para el equipo de Sistemas / IT.
+Maneja:
+ - Visualización en tiempo real de las solicitudes de altas enviadas por RRHH.
+ - Botón para abrir el Modal de Previsualización de Credenciales.
+ - Botón de Re-verificación en vivo para resolver colisiones de nombres/cuentas en batches.
+ - Adaptación condicional del Modal para Empleados "Fuera de Nómina" (sin AD/Mail/VPN).
+ - Ejecución de la aprobación final y aprovisionamiento de cuentas en los servicios MOCK/REAL.
+ - Despliegue de Output con Credenciales creadas y opción de copiado al portapapeles.
+ - Reapertura del Modal de Credenciales para registros ya procesados.
+=================================================================== -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel IT - Aprovisionamiento</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-cpu me-2"></i>Panel IT / Sistemas</a>
+            <div class="d-flex align-items-center">
+                <span class="text-light me-3 small"><i class="bi bi-person-circle me-1"></i> Administrador IT</span>
+                <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold mb-0">Solicitudes de Aprovisionamiento</h2>
+                <p class="text-muted mb-0">Gestión e integración de altas para nuevos empleados.</p>
+            </div>
+            <button onclick="cargarSolicitudes()" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+            </button>
+        </div>
+
+        <div id="alertBox" class="alert alert-success d-none mb-3" role="alert"></div>
+
+        <!-- Tabla de Solicitudes -->
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">ID</th>
+                                <th>Empleado</th>
+                                <th>DNI / Legajo</th>
+                                <th>Perfil AD</th>
+                                <th>Estado</th>
+                                <th class="text-end pe-4">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaSolicitudes">
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">Cargando solicitudes...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE PREVISUALIZACIÓN DE CREDENCIALES -->
+    <div class="modal fade" id="modalPreview" tabindex="-1" aria-labelledby="modalPreviewLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title" id="modalPreviewLabel"><i class="bi bi-eye me-2"></i>Previsualización de Credenciales</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Revise la propuesta generada automáticamente antes de confirmar el alta en los sistemas:</p>
+                    
+                    <div id="modalAlert" class="alert alert-danger d-none mb-3" role="alert"></div>
+
+                    <div id="previewContent" class="row g-3">
+                        <!-- Se llena dinámicamente con JavaScript -->
+                        <div class="text-center py-4 text-muted">Generando preview...</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <input type="hidden" id="solicitudIdActual">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                    
+                    <button type="button" id="btnRecalcular" onclick="recalcularPreview()" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad
+                    </button>
+
+                    <button type="button" id="btnConfirmarAlta" onclick="confirmarAlta()" class="btn btn-success btn-sm">
+                        <i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE OUTPUT DE CREDENCIALES PROCESADAS -->
+    <div class="modal fade" id="modalOutputCredenciales" tabindex="-1" aria-labelledby="modalOutputLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="modalOutputLabel"><i class="bi bi-check-circle-fill me-2"></i>Alta Procesada Exitosamente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2">Las cuentas han sido aprovisionadas. Copie el resumen de credenciales generado:</p>
+                    <div class="mb-3">
+                        <textarea id="outputTextoFormateado" readonly class="form-control font-monospace text-dark bg-light" rows="10" style="font-size: 0.85rem; resize: none;"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer justify-content-between">
+                    <button type="button" onclick="copiarOutputTexto()" class="btn btn-primary btn-sm">
+                        <i class="bi bi-clipboard-check me-1"></i> Copiar Texto Resumen
+                    </button>
+                    <button type="button" class="btn btn-dark btn-sm" data-bs-dismiss="modal" onclick="cargarSolicitudes()">
+                        Entendido / Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Objeto global para almacenar la previsualización activa
+        let previewActualCache = null;
+
+        async function cargarSolicitudes() {
+            try {
+                const response = await fetch('/api/solicitudes');
+                const data = await response.json();
+                const tbody = document.getElementById('tablaSolicitudes');
+                tbody.innerHTML = '';
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No hay solicitudes registradas aún.</td></tr>`;
+                    return;
+                }
+
+                data.forEach(sol => {
+                    const badgeClass = sol.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success';
+                    const fnBadge = sol.es_fuera_de_nomina ? '<span class="badge bg-warning text-dark ms-1">FN</span>' : '';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="ps-4 fw-bold">#${sol.id}</td>
+                            <td>
+                                <div class="fw-bold">${sol.nombre} ${sol.apellido}</div>
+                                <div class="small text-muted">Reporta a: ${sol.reporta_a || 'N/A'}</div>
+                            </td>
+                            <td>
+                                <div class="small">DNI: ${sol.dni}</div>
+                                <div class="small text-muted">Legajo: ${sol.legajo}${fnBadge}</div>
+                            </td>
+                            <td><span class="badge bg-secondary">${sol.perfil_ad || sol.perfil}</span></td>
+                            <td><span class="badge ${badgeClass}">${sol.estado}</span></td>
+                            <td class="text-end pe-4">
+                                ${sol.estado === 'PENDIENTE' 
+                                    ? `<button onclick="abrirPreview(${sol.id})" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-search me-1"></i> Previsualizar</button>` 
+                                    : `<button onclick="verCredenciales(${sol.id})" class="btn btn-sm btn-outline-success"><i class="bi bi-key-fill me-1"></i> Ver Credenciales</button>`}
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (err) {
+                console.error('Error cargando solicitudes:', err);
+            }
+        }
+
+        async function abrirPreview(id, abrirModal = true) {
+            document.getElementById('solicitudIdActual').value = id;
+            const container = document.getElementById('previewContent');
+            const alertBox = document.getElementById('modalAlert');
+            
+            alertBox.classList.add('d-none');
+            alertBox.innerText = '';
+            container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Calculando datos y consultando disponibilidad...</div>`;
+            
+            if (abrirModal) {
+                const modalEl = document.getElementById('modalPreview');
+                let modalInstance = bootstrap.Modal.getInstance(modalEl);
+                if (!modalInstance) {
+                    modalInstance = new bootstrap.Modal(modalEl);
+                }
+                modalInstance.show();
+            }
+
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/preview`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    previewActualCache = data; // Almacenamos respuesta completa
+                    const esFueraDeNomina = data.es_fuera_de_nomina;
+
+                    if (esFueraDeNomina) {
+                        container.innerHTML = `
+                            <div class="col-12">
+                                <div class="alert alert-info py-2 small mb-2">
+                                    <i class="bi bi-info-circle-fill me-1"></i> <strong>Empleado Fuera de Nómina:</strong> No se generarán cuentas de Active Directory, Correo Gmail ni VPN Fortinet.
+                                </div>
+                            </div>
+
+                            <!-- NEO -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
+                            </div>
+
+                            <!-- X-LITE / POSICIÓN -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
+                            </div>
+                        `;
+                    } else {
+                        container.innerHTML = `
+                            <!-- AD / MAIL -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_ad || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail || ''}</span></div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.email || ''}" readonly>
+                            </div>
+
+                            <!-- FORTINET -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet || ''}</span></div>
+                            </div>
+
+                            <!-- NEO -->
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
+                            </div>
+
+                            <!-- X-LITE -->
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
+                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
+                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    container.innerHTML = `<div class="alert alert-danger">Error: ${data.detail || 'Desconocido'}</div>`;
+                }
+            } catch (err) {
+                container.innerHTML = `<div class="alert alert-danger">Error de conexión al generar el preview.</div>`;
+            }
+        }
+
+        async function recalcularPreview() {
+            const id = document.getElementById('solicitudIdActual').value;
+            const btn = document.getElementById('btnRecalcular');
+            
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Re-verificando...`;
+
+            await abrirPreview(id, false);
+
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad`;
+        }
+
+        async function confirmarAlta() {
+            const id = document.getElementById('solicitudIdActual').value;
+            const btnConfirmar = document.getElementById('btnConfirmarAlta');
+            const btnRecalcular = document.getElementById('btnRecalcular');
+            const alertBox = document.getElementById('modalAlert');
+
+            btnConfirmar.disabled = true;
+            btnRecalcular.disabled = true;
+            btnConfirmar.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando Alta...`;
+
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/aprobar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+
+                // Detección de colisión / conflicto (HTTP 409 Conflict)
+                if (response.status === 409) {
+                    alertBox.innerText = `Conflicto de duplicidad detectado: ${data.detail || 'Las credenciales ya han sido asignadas'}. Recalculando nueva propuesta...`;
+                    alertBox.classList.remove('d-none');
+                    
+                    // Se re-ejecuta la previsualización en segundo plano para traer credenciales libres
+                    await abrirPreview(id, false);
+                    return;
+                }
+
+                if (response.ok) {
+                    // Cerrar modal de preview
+                    const modalEl = document.getElementById('modalPreview');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if (modalInstance) modalInstance.hide();
+
+                    // Si el backend devuelve las credenciales finales en la respuesta, usamos esa fuente de verdad
+                    const credencialesFinales = (data && data.credenciales) ? data.credenciales : previewActualCache;
+                    mostrarModalOutput(credencialesFinales);
+                } else {
+                    alertBox.innerText = 'Error al procesar: ' + (data.detail || 'Error desconocido');
+                    alertBox.classList.remove('d-none');
+                }
+            } catch (err) {
+                alertBox.innerText = 'Error de conexión con el servidor al procesar el alta.';
+                alertBox.classList.remove('d-none');
+            } finally {
+                btnConfirmar.disabled = false;
+                btnRecalcular.disabled = false;
+                btnConfirmar.innerHTML = `<i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta`;
+            }
+        }
+
+        async function verCredenciales(id) {
+            try {
+                const response = await fetch(`/api/solicitudes/${id}/preview`);
+                const data = await response.json();
+
+                if (response.ok) {
+                    mostrarModalOutput(data);
+                } else {
+                    alert('No se pudieron recuperar las credenciales: ' + (data.detail || 'Error desconocido'));
+                }
+            } catch (err) {
+                console.error('Error recuperando credenciales:', err);
+                alert('Error al conectar con el servidor.');
+            }
+        }
+
+        function mostrarModalOutput(creds) {
+            if (!creds) return;
+            
+            let textoResumen = `=== ALTA DE USUARIO CONFIRMADA ===\n\n`;
+
+            if (creds.es_fuera_de_nomina) {
+                textoResumen += `[ TIPO: EMPLEADO FUERA DE NÓMINA ]\n`;
+                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
+                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
+                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
+                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
+                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
+            } else {
+                textoResumen += `[ Active Directory / Mail ]\n`;
+                textoResumen += `• Usuario AD: ${creds.usuario_ad || '-'}\n`;
+                textoResumen += `• Mail Corporativo: ${creds.email || '-'}\n`;
+                textoResumen += `• Clave Predeterminada: ${creds.clave_ad_mail || '-'}\n\n`;
+                
+                textoResumen += `[ Fortinet VPN ]\n`;
+                textoResumen += `• Usuario Fortinet: ${creds.usuario_fortinet || '-'}\n`;
+                textoResumen += `• Clave (DNI): ${creds.clave_fortinet || '-'}\n\n`;
+
+                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
+                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
+                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
+                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
+                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
+            }
+            textoResumen += `=================================`;
+
+            document.getElementById('outputTextoFormateado').value = textoResumen;
+            
+            const modalOutputEl = document.getElementById('modalOutputCredenciales');
+            let modalOutput = bootstrap.Modal.getInstance(modalOutputEl);
+            if (!modalOutput) {
+                modalOutput = new bootstrap.Modal(modalOutputEl);
+            }
+            modalOutput.show();
+        }
+
+        function copiarOutputTexto() {
+            const copyText = document.getElementById('outputTextoFormateado');
+            copyText.select();
+            document.execCommand('copy');
+            alert('¡Credenciales copiadas al portapapeles!');
+        }
+
+        // Carga inicial y auto-refresco cada 10s
+        cargarSolicitudes();
+        setInterval(cargarSolicitudes, 10000);
+    </script>
+</body>
+</html>
