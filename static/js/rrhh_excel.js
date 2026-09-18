@@ -3,7 +3,6 @@
    ========================================== */
 
 function toggleSelectAll(master) {
-    // Solo seleccionar/desseleccionar casillas HABILITADAS (Aprobadas)
     const checkboxes = document.querySelectorAll('.item-check:not(:disabled)');
     checkboxes.forEach(cb => cb.checked = master.checked);
     actualizarSeleccion();
@@ -16,9 +15,7 @@ function actualizarSeleccion() {
     const cantLabel = document.getElementById('cantSeleccionados');
     const checkAll = document.getElementById('checkAll');
 
-    if (cantLabel) {
-        cantLabel.textContent = seleccionados.length;
-    }
+    if (cantLabel) cantLabel.textContent = seleccionados.length;
     
     if (btnExportar) {
         if (seleccionados.length > 0) {
@@ -34,14 +31,13 @@ function actualizarSeleccion() {
             checkAll.checked = checkboxesHabilitados.length === seleccionados.length;
         } else {
             checkAll.checked = false;
-            checkAll.disabled = true; // Deshabilita el check general si no hay registros aprobados
+            checkAll.disabled = true;
         }
     }
 }
 
 async function exportarSeleccionados() {
     const seleccionados = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => parseInt(cb.value));
-
     if (seleccionados.length === 0) return;
 
     const btnExportar = document.getElementById('btnExportarSeleccionados');
@@ -71,7 +67,6 @@ async function exportarSeleccionados() {
         if (btnExportar) btnExportar.disabled = false;
     }
 }
-
 
 /* ==========================================
    CARGA MASIVA VÍA EXCEL (SHEETJS)
@@ -109,45 +104,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 function leerExcel(archivo) {
+    if (!archivo) return;
     const reader = new FileReader();
     reader.onload = function(e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 
-        if (!jsonData.length) {
-            renderizarResultadoMasivo(0, ["El archivo Excel está vacío."]);
-            return;
+            if (!jsonData.length) {
+                renderizarResultadoMasivo(0, ["El archivo Excel está vacío."]);
+                limpiarExcel();
+                return;
+            }
+
+            datosExcelProcesados = jsonData.map((row) => {
+                let perfilIngresado = String(row.Perfil || row["Perfil AD"] || '').trim();
+                const perfilValido = typeof PERFILES_PERMITIDOS !== 'undefined' 
+                    ? PERFILES_PERMITIDOS.find(p => p.toLowerCase() === perfilIngresado.toLowerCase()) 
+                    : null;
+                const perfilFinal = perfilValido || "Operador";
+
+                return {
+                    nombre: String(row.Nombre || '').trim(),
+                    apellido: String(row.Apellido || '').trim(),
+                    dni: String(row.DNI || '').trim(),
+                    legajo: String(row.Legajo || '').trim(),
+                    telefono: String(row.Telefono || row["Teléfono"] || '').trim(),
+                    reporta_a: String(row["Reporta A"] || row.ReportaA || '').trim(),
+                    perfil_ad: perfilFinal,
+                    es_fuera_de_nomina: false
+                };
+            });
+
+            // Actualizar vista previa dinámica con datos reales
+            const nombreEl = document.getElementById('nombreArchivoMasivo');
+            const tamanoEl = document.getElementById('tamanoArchivoMasivo');
+            const cantEl = document.getElementById('cantRegistros');
+            const previewEl = document.getElementById('previewMasivo');
+            const btnProcesar = document.getElementById('btnProcesarMasivo');
+            const alertBox = document.getElementById('alertMsgMasivo');
+
+            if (nombreEl) nombreEl.textContent = archivo.name;
+            if (tamanoEl) tamanoEl.textContent = formatBytes(archivo.size);
+            if (cantEl) cantEl.textContent = datosExcelProcesados.length;
+            if (previewEl) previewEl.classList.remove('d-none');
+            if (btnProcesar) btnProcesar.disabled = false;
+            if (alertBox) alertBox.classList.add('d-none');
+        } catch (err) {
+            renderizarResultadoMasivo(0, ["Formato de archivo inválido o error al procesar el Excel."]);
+            limpiarExcel();
         }
-
-        datosExcelProcesados = jsonData.map((row) => {
-            let perfilIngresado = String(row.Perfil || row["Perfil AD"] || '').trim();
-            const perfilValido = typeof PERFILES_PERMITIDOS !== 'undefined' 
-                ? PERFILES_PERMITIDOS.find(p => p.toLowerCase() === perfilIngresado.toLowerCase()) 
-                : null;
-            const perfilFinal = perfilValido || "Operador";
-
-            return {
-                nombre: String(row.Nombre || '').trim(),
-                apellido: String(row.Apellido || '').trim(),
-                dni: String(row.DNI || '').trim(),
-                legajo: String(row.Legajo || '').trim(),
-                telefono: String(row.Telefono || row["Teléfono"] || '').trim(),
-                reporta_a: String(row["Reporta A"] || row.ReportaA || '').trim(),
-                perfil_ad: perfilFinal,
-                es_fuera_de_nomina: false
-            };
-        });
-
-        const cantRegistros = document.getElementById('cantRegistros');
-        if (cantRegistros) cantRegistros.textContent = datosExcelProcesados.length;
-
-        document.getElementById('previewMasivo')?.classList.remove('d-none');
-        document.getElementById('alertMsgMasivo')?.classList.add('d-none');
     };
-    reader.readAsBuffer ? reader.readAsBuffer(archivo) : reader.readAsArrayBuffer(archivo);
+    reader.readAsArrayBuffer ? reader.readAsArrayBuffer(archivo) : reader.readAsBinaryString(archivo);
 }
 
 function limpiarExcel() {
@@ -156,14 +175,18 @@ function limpiarExcel() {
     }
     const fileInput = document.getElementById('fileInput');
     if (fileInput) fileInput.value = '';
-    document.getElementById('previewMasivo')?.classList.add('d-none');
+    const previewEl = document.getElementById('previewMasivo');
+    if (previewEl) previewEl.classList.add('d-none');
+    const btnProcesar = document.getElementById('btnProcesarMasivo');
+    if (btnProcesar) btnProcesar.disabled = true;
 }
 
 async function procesarCargaMasiva() {
     const btn = document.getElementById('btnProcesarMasivo');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando solicitudes...`;
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando (${datosExcelProcesados.length})...`;
     }
 
     let correctos = 0;
@@ -195,7 +218,7 @@ async function procesarCargaMasiva() {
 
     if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-upload me-2"></i>Procesar y Enviar a IT`;
+        btn.innerHTML = originalBtnHtml;
     }
 
     renderizarResultadoMasivo(correctos, errores);
@@ -248,10 +271,10 @@ function descargarPlantilla() {
 
     const wsData = [
         ["Nombre", "Apellido", "DNI", "Legajo", "Telefono", "Reporta A", "Perfil"],
-        ["Juan", "Pérez", "38999888", "1234", "1155443322", "Carlos Gómez", "Operador"],
-        ["María", "López", "40111222", "1235", "1166778899", "Ana Martinez", "Administrativo"],
-        ["Pedro", "Sosa", "35444555", "1236", "1122334455", "Roberto Diaz", "Supervisión"],
-        ["Laura", "Gimenez", "30999111", "1237", "1133221100", "Directorio", "Gerencia"]
+        ["Juan", "Pérez", "38999888", "1234", "1155443322", "juan.perez@tandemtech.com.ar", "Operador"],
+        ["María", "López", "40111222", "1235", "1166778899", "maria.gonzalez@tandemtech.com.ar", "Administrativo"],
+        ["Pedro", "Sosa", "35444555", "1236", "1122334455", "carlos.rodriguez@tandemtech.com.ar", "Supervisión"],
+        ["Laura", "Gimenez", "30999111", "1237", "1133221100", "lucas.gomez@tandemtech.com.ar", "Gerencia"]
     ];
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);

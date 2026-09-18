@@ -1,268 +1,1412 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RRHH - Solicitud de Altas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    
-    <!-- TomSelect (CSS para el desplegable con buscador) -->
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Portal de Gestión de Altas de RRHH</title>
 
-    <!-- Librería XLSX para leer/crear archivos Excel desde el navegador -->
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+    <!-- Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+    <!-- TomSelect CSS (Selector con buscador dinámico) -->
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet"/>
+
+    <!-- SheetJS (Librería XLSX para importación y descarga de plantillas) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <!-- FastAPI Jinja2 Static Stylesheet Hook (compatibilidad FastAPI path='...') -->
+    <link href="{{ url_for('static', path='css/custom.css') }}" rel="stylesheet"/>
+
     <style>
-        body { background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .card-header-custom { background: #0066ff; color: white; font-weight: 600; }
+      :root {
+        --brand-dark: #0F172A;
+        --brand-primary: #2563EB;
+        --brand-primary-hover: #1D4ED8;
+        --bg-light: #F8FAFC;
+        --card-radius: 12px;
+      }
 
-        /* Zona Drag & Drop */
-        .drop-zone {
-            border: 2px dashed #0066ff;
-            border-radius: 8px;
-            padding: 25px;
-            text-align: center;
-            background-color: #f8fafc;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .drop-zone:hover, .drop-zone.dragover {
-            background-color: #e6f0ff;
-            border-color: #0044cc;
-        }
+      body {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: var(--bg-light);
+        color: #1E293B;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
 
-        /* Estilo para ajustar TomSelect al diseño */
-        .ts-control {
-            border-radius: 0.375rem !important;
-            padding: 0.375rem 0.75rem !important;
-        }
+      /* Navbar */
+      .navbar-custom {
+        background-color: var(--brand-dark);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.75rem 1.25rem;
+      }
+
+      .brand-badge-icon {
+        width: 36px;
+        height: 36px;
+        background: rgba(37, 99, 235, 0.2);
+        border: 1px solid rgba(37, 99, 235, 0.4);
+        color: #60A5FA;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+      }
+
+      /* Cards */
+      .custom-card {
+        border-radius: var(--card-radius);
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+      }
+
+      /* Custom Form & Labels */
+      .form-label-sm {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 700;
+        color: #64748B;
+        margin-bottom: 0.35rem;
+      }
+
+      .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #CBD5E1;
+        font-size: 0.875rem;
+        padding: 0.55rem 0.75rem;
+        color: #0F172A;
+        transition: all 0.15s ease-in-out;
+      }
+
+      .form-control:focus, .form-select:focus {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+
+      /* Nav Tabs Custom */
+      .nav-tabs-custom {
+        border-bottom: 1px solid #E2E8F0;
+        gap: 0.5rem;
+      }
+
+      .nav-tabs-custom .nav-link {
+        border: none;
+        color: #64748B;
+        font-weight: 600;
+        font-size: 0.875rem;
+        padding: 0.65rem 1rem;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: transparent;
+        transition: all 0.15s ease;
+      }
+
+      .nav-tabs-custom .nav-link.active {
+        color: var(--brand-primary);
+        background-color: #EFF6FF;
+        font-weight: 700;
+      }
+
+      /* Drag and Drop Zone */
+      .drop-zone {
+        border: 2px dashed #93C5FD;
+        background-color: #F8FAFC;
+        border-radius: var(--card-radius);
+        padding: 2.25rem 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .drop-zone:hover, .drop-zone.dragover {
+        background-color: #EFF6FF;
+        border-color: var(--brand-primary);
+      }
+
+      /* Badges */
+      .badge-aprobado {
+        background-color: #DCFCE7;
+        color: #166534;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      .badge-pendiente {
+        background-color: #FEF3C7;
+        color: #92400E;
+        font-weight: 600;
+        font-size: 0.75rem;
+        padding: 0.35rem 0.65rem;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+      }
+
+      /* Table styling */
+      .table-custom {
+        margin-bottom: 0;
+        font-size: 0.85rem;
+        vertical-align: middle;
+      }
+
+      .table-custom th {
+        background-color: #F8FAFC;
+        color: #475569;
+        font-weight: 600;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #E2E8F0;
+        padding: 0.75rem 0.85rem;
+      }
+
+      .table-custom td {
+        padding: 0.85rem;
+        border-bottom: 1px solid #F1F5F9;
+        color: #334155;
+      }
+
+      .table-custom tr:hover td {
+        background-color: #F8FAFC;
+      }
+
+      /* Primary button */
+      .btn-brand {
+        background-color: var(--brand-primary);
+        color: #FFFFFF;
+        border: none;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.55rem 1rem;
+        transition: background-color 0.15s ease;
+      }
+
+      .btn-brand:hover {
+        background-color: var(--brand-primary-hover);
+        color: #FFFFFF;
+      }
+
+      /* Action icon buttons */
+      .btn-action-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        color: #2563EB;
+        transition: all 0.15s;
+        cursor: pointer;
+      }
+
+      .btn-action-icon:hover:not(:disabled) {
+        background-color: #EFF6FF;
+        border-color: #BFDBFE;
+        color: #1D4ED8;
+      }
+
+      .btn-action-icon:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Modal styling */
+      .modal-content-custom {
+        border-radius: 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 20px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+        overflow: hidden;
+      }
+
+      .credential-card {
+        background-color: #F8FAFC;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        padding: 0.75rem;
+        height: 100%;
+      }
+
+      .key-tag {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #2563EB;
+        background-color: #EFF6FF;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        display: inline-block;
+        margin-bottom: 0.25rem;
+      }
+
+      /* Estilo integrado para TomSelect adaptado a la línea gráfica */
+      .ts-control {
+        border-radius: 8px !important;
+        border: 1px solid #CBD5E1 !important;
+        font-size: 0.875rem !important;
+        padding: 0.55rem 0.75rem !important;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
+        min-height: 38px !important;
+        box-shadow: none !important;
+      }
+      .ts-control.focus {
+        border-color: var(--brand-primary) !important;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15) !important;
+      }
+      .ts-dropdown {
+        border-radius: 8px !important;
+        border: 1px solid #E2E8F0 !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+        font-size: 0.875rem !important;
+        z-index: 1060 !important;
+      }
+      .ts-dropdown .active {
+        background-color: #EFF6FF !important;
+        color: var(--brand-primary) !important;
+      }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-person-plus-fill me-2"></i>Portal RRHH</a>
-            <div class="d-flex align-items-center">
-                <span class="text-light me-3 small"><i class="bi bi-person-circle me-1"></i> Operador RRHH</span>
-                <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</a>
-            </div>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
+  <div class="container-fluid px-2">
+    <!-- Brand & Icon -->
+    <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="#">
+      <div class="brand-badge-icon">
+        <i class="bi bi-person-plus-fill"></i>
+      </div>
+      <div>
+        <div class="fw-bold fs-6 lh-1 text-white">Portal Altas RRHH</div>
+        <small class="text-secondary" style="font-size: 0.7rem;">Gestión &amp; Onboarding</small>
+      </div>
+    </a>
+    <!-- Right User Controls -->
+    <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 bg-dark bg-opacity-50 px-2 py-1 rounded-3 border border-secondary border-opacity-25">
+        <span class="position-relative">
+          <i class="bi bi-person-circle text-light fs-5"></i>
+          <span class="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style="width: 8px; height: 8px;"></span>
+        </span>
+        <div class="d-none d-sm-block text-start lh-1">
+          <span class="text-white small fw-semibold d-block">Operador RRHH</span>
+          <span class="text-success small" style="font-size: 0.65rem;">En línea</span>
         </div>
-    </nav>
+      </div>
+      <a href="/logout" class="btn btn-outline-light btn-sm px-2 py-1 rounded-2 border-opacity-50 d-flex align-items-center gap-1" title="Cerrar Sesión">
+        <i class="bi bi-box-arrow-right"></i>
+        <span class="d-none d-md-inline" style="font-size: 0.8rem;">Salir</span>
+      </a>
+    </div>
+  </div>
+</nav>
 
-    <div class="container-fluid px-4 my-4">
-
-        <!-- Pestañas para elegir modo de carga -->
-        <ul class="nav nav-pills mb-3" id="pills-tab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active fw-bold" id="tab-individual" data-bs-toggle="pill" data-bs-target="#panel-individual" type="button" role="tab">
-                    <i class="bi bi-person-plus me-1"></i> Alta Individual
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link fw-bold" id="tab-masiva" data-bs-toggle="pill" data-bs-target="#panel-masiva" type="button" role="tab">
-                    <i class="bi bi-file-earmark-excel me-1"></i> Carga Masiva (Excel)
-                </button>
-            </li>
+<!-- Contenedor Principal Layout 2 Columnas -->
+<main class="container-fluid px-3 py-3 flex-grow-1">
+  <div class="row g-3">
+    
+    <!-- COLUMNA IZQUIERDA: FORMULARIOS (Alta Individual y Carga Masiva) -->
+    <div class="col-12 col-lg-5 col-xl-5">
+      <div class="custom-card p-3 p-md-4">
+        
+        <!-- Pestañas de Selección de Modo -->
+        <ul class="nav nav-tabs nav-tabs-custom mb-3" id="tabTipoAlta" role="tablist">
+          <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link active w-100 justify-content-center" data-bs-target="#content-individual" data-bs-toggle="tab" id="tab-individual" role="tab" type="button">
+              <i class="bi bi-person-badge"></i> Alta Individual
+            </button>
+          </li>
+          <li class="nav-item flex-fill text-center" role="presentation">
+            <button class="nav-link w-100 justify-content-center" data-bs-target="#content-masiva" data-bs-toggle="tab" id="tab-masiva" role="tab" type="button">
+              <i class="bi bi-file-earmark-spreadsheet"></i> Carga Masiva (Excel)
+            </button>
+          </li>
         </ul>
 
-        <div class="row g-4">
-            <!-- Columna Izquierda: Formularios -->
-            <div class="col-lg-5 col-12">
-                <div class="tab-content" id="pills-tabContent">
+        <!-- Contenido de las Pestañas -->
+        <div class="tab-content" id="tabTipoAltaContent">
+          
+          <!-- PANEL 1: FORMULARIO INDIVIDUAL -->
+          <div class="tab-pane fade show active" id="content-individual" role="tabpanel">
+            
+            <!-- Contenedor para mensajes de alerta del formulario -->
+            <div id="alertMsg" class="alert d-none mb-3" role="alert"></div>
 
-                    <!-- TAB 1: FORMULARIO INDIVIDUAL -->
-                    <div class="tab-pane fade show active" id="panel-individual" role="tabpanel">
-                        <div class="card shadow-sm border-0 rounded-3">
-                            <div class="card-header card-header-custom p-3 rounded-top">
-                                <i class="bi bi-file-earmark-text me-2"></i>Solicitud de Alta de Nuevo Empleado
-                            </div>
-                            <div class="card-body p-4">
-                                <div id="alertMsg" class="alert d-none mb-3" role="alert"></div>
-
-                                <form id="altaForm">
-                                    <div class="row g-3">
-                                        <div class="col-md-6">
-                                            <label class="form-label small text-muted fw-bold">Nombre</label>
-                                            <input type="text" id="nombre" class="form-control" placeholder="ej. Fabio" required>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label small text-muted fw-bold">Apellido</label>
-                                            <input type="text" id="apellido" class="form-control" placeholder="ej. Gomez" required>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label small text-muted fw-bold">DNI</label>
-                                            <input type="text" id="dni" class="form-control" placeholder="ej. 40123456" 
-                                                   maxlength="8" minlength="8" pattern="\d{8}" 
-                                                   oninput="this.value = this.value.replace(/[^0-9]/g, '');" required>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label class="form-label small text-muted fw-bold">Legajo</label>
-                                            <input type="text" id="legajo" class="form-control" placeholder="ej. 1339" 
-                                                   maxlength="4" minlength="4" pattern="\d{4}" 
-                                                   oninput="this.value = this.value.replace(/[^0-9]/g, '');" required>
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label small text-muted fw-bold">Teléfono de Contacto</label>
-                                            <input type="tel" id="telefono" class="form-control" placeholder="ej. 1112345678" 
-                                                   maxlength="10" minlength="6" pattern="\d{6,10}" 
-                                                   oninput="this.value = this.value.replace(/[^0-9]/g, '');" required>
-                                        </div>
-
-                                        <div class="col-12">
-                                            <div class="form-check form-switch bg-light p-2 ps-5 rounded border">
-                                                <input class="form-check-input" type="checkbox" id="esFueraNomina">
-                                                <label class="form-check-label fw-bold text-secondary small" for="esFueraNomina">
-                                                    Empleado Fuera de Nómina (Legajo autogenerado 7000+)
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <!-- CAMPO ACTUALIZADO: SELECT CON BUSCADOR -->
-                                        <div class="col-12">
-                                            <label class="form-label small text-muted fw-bold">A quién reporta</label>
-                                            <select id="reporta_a" placeholder="Escriba para buscar supervisor..." required>
-                                                <option value="">Escriba para buscar supervisor...</option>
-                                            </select>
-                                        </div>
-
-                                        <div class="col-12">
-                                            <label class="form-label small text-muted fw-bold">Perfil / Rol Asignado</label>
-                                            <select id="perfil_ad" class="form-select" required>
-                                                <option value="" selected disabled>Seleccionar perfil...</option>
-                                                <option value="Gerencia">Sistemas</option>
-                                                <option value="Gerencia">Gerencia</option>
-                                                <option value="Supervisión">Administrativo</option>
-                                                <option value="Administrativo">Planificador</option>
-                                                <option value="Operador">Team Leader</option>
-                                                <option value="Operador">Operador</option>
-                                                
-                                                
-                                                
-                                            </select>
-                                        </div>
-                                        <div class="col-12 mt-4">
-                                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold">
-                                                <i class="bi bi-send me-2"></i>Enviar Solicitud a IT
-                                            </button>
-                                        </div>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- TAB 2: CARGA MASIVA (EXCEL / DRAG & DROP) -->
-                    <div class="tab-pane fade" id="panel-masiva" role="tabpanel">
-                        <div class="card shadow-sm border-0 rounded-3">
-                            <div class="card-header bg-dark text-white p-3 rounded-top d-flex justify-content-between align-items-center">
-                                <span class="fw-bold"><i class="bi bi-file-earmark-excel me-2"></i>Importación Masiva desde Excel</span>
-                                <button type="button" onclick="descargarPlantilla()" class="btn btn-sm btn-outline-light">
-                                    <i class="bi bi-download me-1"></i>Plantilla
-                                </button>
-                            </div>
-                            <div class="card-body p-4">
-                                <div id="alertMsgMasivo" class="alert d-none mb-3" role="alert"></div>
-
-                                <!-- Zona de Arrastre -->
-                                <div id="dropZone" class="drop-zone mb-3">
-                                    <i class="bi bi-cloud-arrow-up display-5 text-primary"></i>
-                                    <p class="fw-bold mb-1 mt-2">Arrastra tu archivo Excel aquí</p>
-                                    <span class="text-muted small">o haz clic para examinar desde tu equipo (.xlsx, .xls)</span>
-                                    <input type="file" id="fileInput" accept=".xlsx, .xls" class="d-none">
-                                </div>
-
-                                <div id="previewMasivo" class="d-none">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="small fw-bold text-secondary">Registros detectados: <strong id="cantRegistros">0</strong></span>
-                                        <button class="btn btn-sm btn-link text-danger p-0" onclick="limpiarExcel()"><i class="bi bi-trash"></i> Quitar</button>
-                                    </div>
-                                    <button id="btnProcesarMasivo" onclick="procesarCargaMasiva()" class="btn btn-primary w-100 py-2 fw-bold">
-                                        <i class="bi bi-upload me-2"></i>Procesar y Enviar a IT
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+            <form id="altaForm" novalidate>
+              <div class="row g-2">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label-sm" for="nombre">Nombre <span class="text-danger">*</span></label>
+                  <input class="form-control" id="nombre" name="nombre" placeholder="Ej. Camila" required maxlength="50" autocomplete="off" type="text"/>
                 </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label-sm" for="apellido">Apellido <span class="text-danger">*</span></label>
+                  <input class="form-control" id="apellido" name="apellido" placeholder="Ej. Rossi" required maxlength="50" autocomplete="off" type="text"/>
+                </div>
+              </div>
+
+              <div class="row g-2 mt-1">
+                <div class="col-12 col-sm-6">
+                  <label class="form-label-sm" for="dni">DNI / Documento <span class="text-danger">*</span></label>
+                  <input class="form-control" id="dni" name="dni" placeholder="Ej. 38192834" 
+                         maxlength="8" minlength="8" pattern="\d{8}" 
+                         oninput="this.value = this.value.replace(/[^0-9]/g, '');" required autocomplete="off" type="text"/>
+                </div>
+                <div class="col-12 col-sm-6">
+                  <label class="form-label-sm" for="legajo">N° Legajo <span class="text-danger" id="legajoReqMark">*</span></label>
+                  <input class="form-control" id="legajo" name="legajo" placeholder="Ej. 1339" 
+                         maxlength="4" minlength="4" pattern="\d{4}" 
+                         oninput="this.value = this.value.replace(/[^0-9]/g, '');" required autocomplete="off" type="text"/>
+                </div>
+              </div>
+
+              <div class="mt-2">
+                <label class="form-label-sm" for="telefono">Teléfono de Contacto <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0"><i class="bi bi-telephone"></i></span>
+                  <input class="form-control border-start-0" id="telefono" name="telefono" placeholder="Ej. 1148291029 (6 a 10 dígitos)" 
+                         maxlength="10" minlength="6" pattern="\d{6,10}" 
+                         oninput="this.value = this.value.replace(/[^0-9]/g, '');" required autocomplete="off" type="tel"/>
+                </div>
+              </div>
+
+              <div class="mt-2">
+                <label class="form-label-sm" for="perfil_ad">Perfil Active Directory (AD) <span class="text-danger">*</span></label>
+                <select class="form-select" id="perfil_ad" name="perfil_ad" required>
+                  <option disabled selected value="">Seleccionar perfil de acceso...</option>
+                  <option value="Operador">Operador (Atención / Operaciones)</option>
+                  <option value="Administrativo">Administrativo (Planificador / Gestión)</option>
+                  <option value="Supervisión">Supervisión (Team Leader)</option>
+                  <option value="Gerencia">Gerencia / Sistemas</option>
+                </select>
+              </div>
+
+              <!-- Selector de Supervisor con TomSelect -->
+              <div class="mt-2">
+                <label class="form-label-sm" for="reporta_a">Supervisor / Reporta a <span class="text-danger">*</span></label>
+                <select id="reporta_a" name="reporta_a" placeholder="Escriba para buscar supervisor directo..." required>
+                  <option value="">Escriba para buscar supervisor directo...</option>
+                </select>
+              </div>
+
+              <!-- Switch Fuera de Nómina -->
+              <div class="mt-3 p-2 rounded-2 bg-light border">
+                <div class="form-check form-switch d-flex align-items-center justify-content-between p-0 m-0">
+                  <label class="form-check-label fw-semibold small text-dark cursor-pointer pe-3" for="esFueraNomina">
+                    <i class="bi bi-briefcase me-1 text-primary"></i> Personal Fuera de Nómina (Contractor / Legajo 7000+)
+                  </label>
+                  <input class="form-check-input m-0 float-none" id="esFueraNomina" name="esFueraNomina" role="switch" style="cursor: pointer; width: 2.2rem; height: 1.2rem;" type="checkbox"/>
+                </div>
+              </div>
+
+              <div class="mt-3 d-grid">
+                <button class="btn btn-brand py-2" id="btnSubmitAlta" type="submit">
+                  <i class="bi bi-send-check-fill me-1"></i> Procesar Alta
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- PANEL 2: CARGA MASIVA (EXCEL) -->
+          <div class="tab-pane fade" id="content-masiva" role="tabpanel">
+            
+            <!-- Zona de Arrastre Drag & Drop -->
+            <div class="drop-zone mb-3" id="dropZone">
+              <div class="mb-2">
+                <i class="bi bi-cloud-arrow-up-fill text-primary display-5"></i>
+              </div>
+              <h6 class="fw-bold mb-1 text-dark">Arrastra tu planilla Excel aquí</h6>
+              <p class="text-muted small mb-2">o haz clic para explorar en tu equipo</p>
+              <span class="badge bg-light text-secondary border px-2 py-1" style="font-size: 0.72rem;">Soporta .XLSX, .XLS o .CSV (máx. 10MB)</span>
+              <input accept=".xlsx, .xls, .csv" class="d-none" id="fileInput" name="fileInput" type="file"/>
             </div>
 
-            <!-- Columna Derecha: Tabla de Solicitudes Enviadas -->
-            <div class="col-lg-7 col-12">
-                <div class="card shadow-sm border-0 rounded-3">
-                    <div class="card-header bg-white p-3 d-flex justify-content-between align-items-center">
-                        <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-clock-history me-2"></i>Mis Solicitudes Enviadas</h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <button id="btnExportarSeleccionados" onclick="exportarSeleccionados()" class="btn btn-success btn-sm d-none">
-                                <i class="bi bi-file-earmark-excel me-1"></i> Exportar (<span id="cantSeleccionados">0</span>)
-                            </button>
-                            <button onclick="cargarMisSolicitudes()" class="btn btn-outline-secondary btn-sm" title="Actualizar lista">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="ps-3" style="width: 40px;">
-                                            <input class="form-check-input" type="checkbox" id="checkAll" onchange="toggleSelectAll(this)">
-                                        </th>
-                                        <th>#</th>
-                                        <th>Empleado</th>
-                                        <th>Legajo / Tel.</th>
-                                        <th>Reporta a</th>
-                                        <th>Perfil</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tablaMisSolicitudes">
-                                    <tr>
-                                        <td colspan="7" class="text-center py-4 text-muted">Cargando historial...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            <!-- Contenedor para mensajes de estado masivo -->
+            <div id="alertMsgMasivo" class="alert d-none mb-3" role="alert"></div>
+
+            <!-- Vista Previa Dinámica del Archivo Adjunto -->
+            <div id="previewMasivo" class="card bg-light border p-2 rounded-3 mb-3 d-none">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2 overflow-hidden">
+                  <div class="bg-success bg-opacity-10 text-success p-2 rounded-2 flex-shrink-0">
+                    <i class="bi bi-file-earmark-excel fs-4"></i>
+                  </div>
+                  <div class="overflow-hidden">
+                    <div id="nombreArchivoMasivo" class="fw-semibold small text-truncate" style="max-width: 200px;">archivo.xlsx</div>
+                    <small class="text-muted" style="font-size: 0.7rem;"><span id="tamanoArchivoMasivo">0 KB</span> • <strong id="cantRegistros">0</strong> registros detectados</small>
+                  </div>
                 </div>
+                <button aria-label="Eliminar archivo" id="btnQuitarArchivo" onclick="limpiarExcel()" class="btn btn-sm btn-link text-danger p-0 text-decoration-none" type="button" title="Quitar archivo">
+                  <i class="bi bi-trash fs-5"></i>
+                </button>
+              </div>
             </div>
+
+            <div class="d-grid gap-2">
+              <button id="btnProcesarMasivo" onclick="procesarCargaMasiva()" class="btn btn-brand" type="button" disabled>
+                <i class="bi bi-upload me-1"></i> Validar e Importar Planilla
+              </button>
+              <button id="btnDescargarPlantilla" onclick="descargarPlantilla()" class="btn btn-outline-secondary btn-sm" type="button">
+                <i class="bi bi-download me-1"></i> Descargar plantilla modelo
+              </button>
+            </div>
+          </div>
 
         </div>
+      </div>
     </div>
 
-    <!-- MODAL DE DETALLE DE CREDENCIALES APROBADAS -->
-    <div class="modal fade" id="modalVerCredencialesRRHH" tabindex="-1" aria-labelledby="modalVerCredencialesLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="modalVerCredencialesLabel"><i class="bi bi-folder-check me-2"></i>Información de Credenciales Procesadas</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-3">Detalle de cuentas y accesos generados por el equipo de IT:</p>
-                    <div id="detalleCredencialesContent" class="row g-3">
-                        <div class="text-center py-4 text-muted">Cargando datos...</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
-                </div>
-            </div>
+    <!-- COLUMNA DERECHA: TABLA DE HISTORIAL DE SOLICITUDES -->
+    <div class="col-12 col-lg-7 col-xl-7">
+      <div class="custom-card p-3 p-md-4">
+        
+        <!-- Encabezado de Solicitudes -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+          <div>
+            <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+              <i class="bi bi-clock-history text-primary"></i> Mis Solicitudes Enviadas
+            </h5>
+            <small class="text-muted">Historial y estado de procesamiento en AD y nómina</small>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark border d-flex align-items-center px-2 py-1">
+              Total: <strong class="ms-1" id="totalSolicitudesContador">0</strong>
+            </span>
+            <button id="btnExportarSeleccionados" onclick="exportarSeleccionados()" class="btn btn-success btn-sm d-none" title="Exportar aprobados a Excel">
+              <i class="bi bi-file-earmark-excel me-1"></i> Exportar (<span id="cantSeleccionados">0</span>)
+            </button>
+            <button onclick="cargarMisSolicitudes()" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Actualizar lista">
+              <i class="bi bi-arrow-clockwise"></i>
+            </button>
+          </div>
         </div>
+
+        <!-- Tabla de historial -->
+        <div class="table-responsive rounded-3 border">
+          <table class="table table-custom table-hover mb-0">
+            <thead>
+              <tr>
+                <th class="text-center" scope="col" style="width: 38px;">
+                  <input aria-label="Seleccionar todo" class="form-check-input m-0" id="checkAll" type="checkbox" onchange="toggleSelectAll(this)" disabled/>
+                </th>
+                <th scope="col">Colaborador</th>
+                <th scope="col">DNI / Legajo</th>
+                <th scope="col">Reporta a</th>
+                <th scope="col">Perfil AD</th>
+                <th scope="col">Estado</th>
+                <th class="text-end" scope="col" style="width: 60px;">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="tablaMisSolicitudes">
+              <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                  <span class="spinner-border spinner-border-sm me-2"></span>Cargando historial de solicitudes...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Resumen inferior y Sincronización -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 pt-2 border-top gap-2">
+          <span class="small text-muted" id="resumenSolicitudesPaginacion">Mostrando 0 solicitudes</span>
+          <div class="d-flex gap-1">
+            <button class="btn btn-sm btn-outline-secondary px-3" onclick="cargarMisSolicitudes()">
+              <i class="bi bi-arrow-repeat me-1"></i> Sincronizar
+            </button>
+          </div>
+        </div>
+
+      </div>
     </div>
 
-    <!-- Librerías de Terceros -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- TomSelect (JS para el buscador en línea) -->
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+  </div>
+</main>
 
-    <!-- Módulos JavaScript Propios (Mantener estrictamente este orden) -->
-    <script src="{{ url_for('static', path='js/rrhh_globales.js') }}"></script>
-    <script src="{{ url_for('static', path='js/rrhh_solicitudes.js') }}"></script>
-    <script src="{{ url_for('static', path='js/rrhh_formulario.js') }}"></script>
-    <script src="{{ url_for('static', path='js/rrhh_excel.js') }}"></script>
+<!-- MODAL DE CREDENCIALES PROCESADAS -->
+<div aria-hidden="true" aria-labelledby="modalVerCredencialesRRHHLabel" class="modal fade" id="modalVerCredencialesRRHH" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content modal-content-custom">
+      <div class="modal-header bg-dark text-white border-0 py-3 px-4" style="background-color: var(--brand-dark) !important;">
+        <div class="d-flex align-items-center gap-2">
+          <div class="bg-primary bg-opacity-25 text-primary p-2 rounded-3">
+            <i class="bi bi-shield-lock-fill text-info fs-5"></i>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold fs-6 mb-0" id="modalVerCredencialesRRHHLabel">Credenciales Generadas (Modo Lectura)</h5>
+            <small class="text-light text-opacity-75" style="font-size: 0.75rem;">Provisión segura en Active Directory y Suite Corporativa</small>
+          </div>
+        </div>
+        <button aria-label="Cerrar" class="btn-close btn-close-white" data-bs-dismiss="modal" type="button"></button>
+      </div>
+      <div class="modal-body p-4">
+        <!-- Contenedor dinámico inyectado por verDetalleAprobado() -->
+        <div id="detalleCredencialesContent">
+          <div class="text-center py-4 text-muted">
+            <span class="spinner-border spinner-border-sm me-2"></span>Cargando datos...
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-top px-4 py-3">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" type="button">Cerrar</button>
+        <button class="btn btn-brand btn-sm" onclick="imprimirFichaCredenciales()" type="button">
+          <i class="bi bi-printer me-1"></i> Imprimir Ficha
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap 5 Bundle con Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- TomSelect JS -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+
+<!-- FastAPI Jinja2 Static Script Hooks (Compatibilidad FastAPI path='...') -->
+<script src="{{ url_for('static', path='js/rrhh_globales.js') }}"></script>
+<script src="{{ url_for('static', path='js/rrhh_solicitudes.js') }}"></script>
+<script src="{{ url_for('static', path='js/rrhh_formulario.js') }}"></script>
+<script src="{{ url_for('static', path='js/rrhh_excel.js') }}"></script>
+
+<!-- =======================================================
+     LÓGICA JAVASCRIPT INTEGRADA Y AUTÓNOMA
+     Conecta Formulario Individual, Carga Masiva, Tabla y Modal
+     ======================================================= -->
+<script>
+(function() {
+  // Si los módulos estáticos externos ya fueron cargados por FastAPI, omitir la inicialización duplicada
+  if (window.__RRHH_MODULAR_LOADED__) {
+    console.log('Portal RRHH: Módulos estáticos externos cargados.');
+    return;
+  }
+
+  // Constantes y Estado
+  const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
+  let datosExcelProcesados = [];
+  let pollingIntervalRRHH = null;
+  let tomSelectInstance = null;
+
+  // Lista local por defecto de supervisores
+  const SUPERVISORES_HABILITADOS = [
+    { nombre: "Juan Pérez", email: "juan.perez@tandemtech.com.ar", rol: "Gerente de Operaciones" },
+    { nombre: "María González", email: "maria.gonzalez@tandemtech.com.ar", rol: "Team Leader Contact Center" },
+    { nombre: "Carlos Rodríguez", email: "carlos.rodriguez@tandemtech.com.ar", rol: "Planificador WFM" },
+    { nombre: "Ana Martínez", email: "ana.martinez@tandemtech.com.ar", rol: "Supervisora Turno Mañana" },
+    { nombre: "Lucas Gómez", email: "lucas.gomez@tandemtech.com.ar", rol: "Jefe de Sistemas" }
+  ];
+
+  document.addEventListener('DOMContentLoaded', () => {
+    inicializarSelectorSupervisores();
+    inicializarFormularioIndividual();
+    inicializarCargaMasiva();
+    cargarMisSolicitudes();
+    iniciarPolling();
+  });
+
+  /* ------------------------------------------------------------------
+     1. SELECTOR DINÁMICO DE SUPERVISOR (TomSelect)
+     ------------------------------------------------------------------ */
+  async function inicializarSelectorSupervisores() {
+    const selectReportaA = document.getElementById('reporta_a');
+    if (!selectReportaA) return;
+
+    let lista = SUPERVISORES_HABILITADOS;
+    try {
+      const res = await fetch('/api/solicitudes/reportantes/buscar?q=');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          lista = data;
+        }
+      }
+    } catch (err) {
+      console.warn('Usando lista local de supervisores:', err);
+    }
+
+    const options = lista.map(sup => {
+      const email = typeof sup === 'string' ? sup : (sup.email || '');
+      const nombre = typeof sup === 'object' && sup.nombre ? sup.nombre : email;
+      const rol = typeof sup === 'object' && sup.rol ? sup.rol : '';
+      return {
+        value: email || nombre,
+        text: `${nombre} (${email})`,
+        subtext: rol
+      };
+    });
+
+    if (window.TomSelect) {
+      if (tomSelectInstance) {
+        tomSelectInstance.destroy();
+      }
+      tomSelectInstance = new TomSelect('#reporta_a', {
+        options: options,
+        valueField: 'value',
+        labelField: 'text',
+        searchField: ['text', 'value', 'subtext'],
+        create: false,
+        maxOptions: 50,
+        placeholder: 'Escriba para buscar supervisor directo...',
+        dropdownParent: 'body',
+        render: {
+          option: function(data, escape) {
+            return `<div class="py-1">
+              <div class="fw-semibold text-dark">${escape(data.text)}</div>
+              ${data.subtext ? `<small class="text-muted">${escape(data.subtext)}</small>` : ''}
+            </div>`;
+          }
+        }
+      });
+    }
+  }
+
+  /* ------------------------------------------------------------------
+     2. FORMULARIO DE ALTA INDIVIDUAL
+     ------------------------------------------------------------------ */
+  function inicializarFormularioIndividual() {
+    const altaForm = document.getElementById('altaForm');
+    if (!altaForm) return;
+
+    const inputLegajo = document.getElementById('legajo');
+    const checkboxFN = document.getElementById('esFueraNomina');
+    const legajoReqMark = document.getElementById('legajoReqMark');
+
+    // Switch Fuera de Nómina
+    if (checkboxFN && inputLegajo) {
+      checkboxFN.addEventListener('change', () => {
+        if (checkboxFN.checked) {
+          inputLegajo.value = '';
+          inputLegajo.disabled = true;
+          inputLegajo.removeAttribute('required');
+          inputLegajo.placeholder = 'Autogenerado 7000+ (FN)';
+          if (legajoReqMark) legajoReqMark.classList.add('d-none');
+        } else {
+          inputLegajo.disabled = false;
+          inputLegajo.setAttribute('required', 'required');
+          inputLegajo.placeholder = 'Ej. 1339';
+          if (legajoReqMark) legajoReqMark.classList.remove('d-none');
+        }
+      });
+    }
+
+    // Envío del Formulario
+    altaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const alertMsg = document.getElementById('alertMsg');
+      if (alertMsg) alertMsg.classList.add('d-none');
+
+      const nombreVal = document.getElementById('nombre')?.value.trim() || '';
+      const apellidoVal = document.getElementById('apellido')?.value.trim() || '';
+      const dniVal = document.getElementById('dni')?.value.trim() || '';
+      const legajoVal = inputLegajo ? inputLegajo.value.trim() : '';
+      const telefonoVal = document.getElementById('telefono')?.value.trim() || '';
+      const reportaAVal = tomSelectInstance ? tomSelectInstance.getValue() : (document.getElementById('reporta_a')?.value || '');
+      const perfilVal = document.getElementById('perfil_ad')?.value || '';
+      const esFueraNomina = checkboxFN ? checkboxFN.checked : false;
+
+      // Validaciones Estrictas
+      if (!nombreVal || !apellidoVal) {
+        mostrarErrorAlta('Por favor, ingrese el nombre y apellido del colaborador.');
+        return;
+      }
+      if (!/^\d{8}$/.test(dniVal)) {
+        mostrarErrorAlta('El DNI debe tener exactamente 8 dígitos numéricos.');
+        document.getElementById('dni')?.focus();
+        return;
+      }
+      if (!esFueraNomina && !/^\d{4}$/.test(legajoVal)) {
+        mostrarErrorAlta('El Legajo debe tener exactamente 4 dígitos numéricos.');
+        inputLegajo?.focus();
+        return;
+      }
+      if (!/^\d{6,10}$/.test(telefonoVal)) {
+        mostrarErrorAlta('El Teléfono debe contener entre 6 y 10 dígitos numéricos.');
+        document.getElementById('telefono')?.focus();
+        return;
+      }
+      if (!perfilVal) {
+        mostrarErrorAlta('Debe seleccionar un perfil Active Directory.');
+        document.getElementById('perfil_ad')?.focus();
+        return;
+      }
+      if (!reportaAVal) {
+        mostrarErrorAlta('Debe seleccionar un supervisor directo de la lista.');
+        if (tomSelectInstance) tomSelectInstance.focus();
+        return;
+      }
+
+      const btnSubmit = document.getElementById('btnSubmitAlta');
+      const originalBtnHtml = btnSubmit ? btnSubmit.innerHTML : '';
+      if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Procesando...';
+      }
+
+      const payload = {
+        nombre: nombreVal,
+        apellido: apellidoVal,
+        dni: dniVal,
+        legajo: esFueraNomina ? '' : legajoVal,
+        telefono: telefonoVal,
+        reporta_a: reportaAVal,
+        perfil_ad: perfilVal,
+        es_fuera_de_nomina: esFueraNomina
+      };
+
+      try {
+        const response = await fetch('/api/solicitudes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const resData = await response.json();
+
+        if (response.ok) {
+          if (alertMsg) {
+            alertMsg.className = 'alert alert-success d-flex align-items-center mb-3';
+            alertMsg.innerHTML = '<i class="bi bi-check-circle-fill fs-5 me-2"></i><div><strong>¡Solicitud enviada!</strong> El alta se ha registrado exitosamente.</div>';
+            alertMsg.classList.remove('d-none');
+          }
+          altaForm.reset();
+          if (tomSelectInstance) tomSelectInstance.clear();
+          if (inputLegajo) {
+            inputLegajo.disabled = false;
+            inputLegajo.setAttribute('required', 'required');
+            inputLegajo.placeholder = 'Ej. 1339';
+          }
+          if (legajoReqMark) legajoReqMark.classList.remove('d-none');
+          await cargarMisSolicitudes();
+        } else {
+          mostrarErrorAlta(resData.detail || 'Error al procesar la solicitud.');
+        }
+      } catch (err) {
+        mostrarErrorAlta('Error de comunicación con el servidor (/api/solicitudes).');
+      } finally {
+        if (btnSubmit) {
+          btnSubmit.disabled = false;
+          btnSubmit.innerHTML = originalBtnHtml;
+        }
+      }
+    });
+  }
+
+  function mostrarErrorAlta(mensaje) {
+    const alertMsg = document.getElementById('alertMsg');
+    if (!alertMsg) return;
+    alertMsg.className = 'alert alert-danger d-flex align-items-center mb-3';
+    alertMsg.innerHTML = `<i class="bi bi-exclamation-triangle-fill fs-5 me-2"></i><div>${mensaje}</div>`;
+    alertMsg.classList.remove('d-none');
+  }
+
+  /* ------------------------------------------------------------------
+     3. CARGA MASIVA (Excel / CSV)
+     ------------------------------------------------------------------ */
+  function inicializarCargaMasiva() {
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    if (!dropZone || !fileInput) return;
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        leerExcel(e.dataTransfer.files[0]);
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length) {
+        leerExcel(e.target.files[0]);
+      }
+    });
+  }
+
+  function formatBytes(bytes) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  }
+
+  function leerExcel(archivo) {
+    if (!archivo) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+
+        if (!jsonData || jsonData.length === 0) {
+          renderizarResultadoMasivo(0, ["El archivo Excel está vacío o no contiene registros válidos."]);
+          limpiarExcel();
+          return;
+        }
+
+        datosExcelProcesados = jsonData.map(row => {
+          let perfilIngresado = String(row.Perfil || row["Perfil AD"] || '').trim();
+          const perfilValido = PERFILES_PERMITIDOS.find(p => p.toLowerCase() === perfilIngresado.toLowerCase());
+          const perfilFinal = perfilValido || "Operador";
+
+          return {
+            nombre: String(row.Nombre || '').trim(),
+            apellido: String(row.Apellido || '').trim(),
+            dni: String(row.DNI || '').trim(),
+            legajo: String(row.Legajo || '').trim(),
+            telefono: String(row.Telefono || row["Teléfono"] || '').trim(),
+            reporta_a: String(row["Reporta A"] || row.ReportaA || '').trim(),
+            perfil_ad: perfilFinal,
+            es_fuera_de_nomina: false
+          };
+        });
+
+        // Actualizar interfaz visual de vista previa con datos reales
+        const nombreEl = document.getElementById('nombreArchivoMasivo');
+        const tamanoEl = document.getElementById('tamanoArchivoMasivo');
+        const cantEl = document.getElementById('cantRegistros');
+        const previewEl = document.getElementById('previewMasivo');
+        const btnProcesar = document.getElementById('btnProcesarMasivo');
+        const alertBox = document.getElementById('alertMsgMasivo');
+
+        if (nombreEl) nombreEl.textContent = archivo.name;
+        if (tamanoEl) tamanoEl.textContent = formatBytes(archivo.size);
+        if (cantEl) cantEl.textContent = datosExcelProcesados.length;
+        if (previewEl) previewEl.classList.remove('d-none');
+        if (btnProcesar) btnProcesar.disabled = false;
+        if (alertBox) alertBox.classList.add('d-none');
+      } catch (err) {
+        renderizarResultadoMasivo(0, ["Formato de archivo inválido o error al procesar el Excel."]);
+        limpiarExcel();
+      }
+    };
+    reader.readAsArrayBuffer ? reader.readAsArrayBuffer(archivo) : reader.readAsBinaryString(archivo);
+  }
+
+  window.limpiarExcel = function() {
+    datosExcelProcesados = [];
+    const fileInput = document.getElementById('fileInput');
+    if (fileInput) fileInput.value = '';
+    const previewEl = document.getElementById('previewMasivo');
+    if (previewEl) previewEl.classList.add('d-none');
+    const btnProcesar = document.getElementById('btnProcesarMasivo');
+    if (btnProcesar) btnProcesar.disabled = true;
+  };
+
+  window.procesarCargaMasiva = async function() {
+    if (!datosExcelProcesados || datosExcelProcesados.length === 0) return;
+
+    const btn = document.getElementById('btnProcesarMasivo');
+    const originalBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando (${datosExcelProcesados.length})...`;
+    }
+
+    let correctos = 0;
+    let errores = [];
+
+    for (let i = 0; i < datosExcelProcesados.length; i++) {
+      const item = datosExcelProcesados[i];
+      const numFila = i + 2;
+
+      try {
+        const res = await fetch('/api/solicitudes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          correctos++;
+        } else {
+          errores.push(`Fila ${numFila} (${item.nombre} ${item.apellido}): ${data.detail || 'Error en validación'}`);
+        }
+      } catch (err) {
+        errores.push(`Fila ${numFila} (${item.nombre} ${item.apellido}): Error de conexión con el servidor`);
+      }
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHtml;
+    }
+
+    renderizarResultadoMasivo(correctos, errores);
+    await cargarMisSolicitudes();
+  };
+
+  function renderizarResultadoMasivo(correctos, errores) {
+    const alertBox = document.getElementById('alertMsgMasivo');
+    if (!alertBox) return;
+
+    alertBox.classList.remove('d-none');
+    const totalFallos = errores.length;
+    const tipoAlerta = totalFallos === 0 ? 'success' : (correctos > 0 ? 'warning' : 'danger');
+
+    let html = `
+      <div class="fw-bold mb-1">
+        <i class="bi ${totalFallos === 0 ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-1"></i>
+        Proceso terminado: ${correctos} exitosas, ${totalFallos} con error.
+      </div>
+    `;
+
+    if (totalFallos > 0) {
+      html += `
+        <div class="mt-2 text-start">
+          <div class="fw-bold small text-danger mb-1">Detalle de observaciones:</div>
+          <ul class="list-group list-group-flush border rounded bg-white small" style="max-height: 180px; overflow-y: auto;">
+      `;
+      errores.forEach(err => {
+        html += `<li class="list-group-item list-group-item-danger py-1 px-2 text-wrap small"><sup>•</sup> ${err}</li>`;
+      });
+      html += `</ul></div>`;
+    }
+
+    alertBox.className = `alert alert-${tipoAlerta} p-3 mb-3`;
+    alertBox.innerHTML = html;
+
+    if (totalFallos === 0) {
+      limpiarExcel();
+    }
+  }
+
+  window.descargarPlantilla = function() {
+    const wb = XLSX.utils.book_new();
+    const wsData = [
+      ["Nombre", "Apellido", "DNI", "Legajo", "Telefono", "Reporta A", "Perfil"],
+      ["Juan", "Pérez", "38999888", "1234", "1155443322", "juan.perez@tandemtech.com.ar", "Operador"],
+      ["María", "López", "40111222", "1235", "1166778899", "maria.gonzalez@tandemtech.com.ar", "Administrativo"],
+      ["Pedro", "Sosa", "35444555", "1236", "1122334455", "carlos.rodriguez@tandemtech.com.ar", "Supervisión"],
+      ["Laura", "Gimenez", "30999111", "1237", "1133221100", "lucas.gomez@tandemtech.com.ar", "Gerencia"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    XLSX.utils.book_append_sheet(wb, ws, "Plantilla_Altas");
+    XLSX.writeFile(wb, "Plantilla_Altas_RRHH.xlsx");
+  };
+
+  /* ------------------------------------------------------------------
+     4. HISTORIAL DE SOLICITUDES Y TABLA DINÁMICA
+     ------------------------------------------------------------------ */
+  window.cargarMisSolicitudes = async function(silencioso = false) {
+    const tbody = document.getElementById('tablaMisSolicitudes');
+    const totalBadge = document.getElementById('totalSolicitudesContador');
+    const resumenPaginacion = document.getElementById('resumenSolicitudesPaginacion');
+
+    try {
+      const prevSeleccionados = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => String(cb.value));
+      const response = await fetch('/api/solicitudes');
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      const data = await response.json();
+
+      if (!tbody) return;
+
+      if (!Array.isArray(data) || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted">No has generado solicitudes todavía.</td></tr>`;
+        if (totalBadge) totalBadge.textContent = '0';
+        if (resumenPaginacion) resumenPaginacion.textContent = 'Mostrando 0 solicitudes';
+        actualizarSeleccion();
+        return;
+      }
+
+      if (totalBadge) totalBadge.textContent = data.length;
+      if (resumenPaginacion) resumenPaginacion.textContent = `Mostrando 1 a ${data.length} de ${data.length} solicitudes`;
+
+      let html = '';
+      data.forEach(sol => {
+        const esAprobado = sol.estado === 'PROCESADO' || sol.estado === 'APROBADO';
+        const isChecked = (esAprobado && prevSeleccionados.includes(String(sol.id))) ? 'checked' : '';
+        const fnBadge = sol.es_fuera_de_nomina ? '<small class="text-danger fw-semibold d-block" style="font-size: 0.72rem;">F. Nómina</small>' : `<small class="text-muted d-block">LEG-${sol.legajo || 'N/A'}</small>`;
+        const perfilMostrar = sol.perfil_ad || sol.perfil || 'Operador';
+        const correoGenerado = sol.email || `${(sol.nombre || '').charAt(0).toLowerCase()}${(sol.apellido || '').toLowerCase()}@tandemtech.com.ar`;
+
+        html += `
+          <tr class="${!esAprobado ? 'opacity-75' : ''}">
+            <td class="text-center">
+              ${esAprobado ? `
+                <input class="form-check-input item-check m-0" type="checkbox" value="${sol.id}" ${isChecked} onchange="actualizarSeleccion()">
+              ` : `
+                <input class="form-check-input item-check m-0" type="checkbox" value="${sol.id}" disabled title="Solo se pueden exportar solicitudes aprobadas">
+              `}
+            </td>
+            <td>
+              <div class="fw-semibold text-dark">${sol.nombre || ''} ${sol.apellido || ''}</div>
+              <small class="text-muted" style="font-size: 0.72rem;">${correoGenerado}</small>
+            </td>
+            <td>
+              <div class="fw-medium">${sol.dni || 'N/A'}</div>
+              ${fnBadge}
+            </td>
+            <td>
+              <span class="small text-muted text-truncate d-inline-block" style="max-width: 140px;" title="${sol.reporta_a || 'N/A'}">${sol.reporta_a || 'N/A'}</span>
+            </td>
+            <td>
+              <span class="badge bg-secondary bg-opacity-10 text-secondary border-0">${perfilMostrar}</span>
+            </td>
+            <td>
+              ${esAprobado ? `
+                <span class="badge-aprobado">
+                  <i class="bi bi-check-circle-fill"></i> Aprobado
+                </span>
+              ` : `
+                <span class="badge-pendiente">
+                  <i class="bi bi-hourglass-split"></i> Pendiente IT
+                </span>
+              `}
+            </td>
+            <td class="text-end">
+              <button class="btn-action-icon" onclick="verDetalleAprobado(${sol.id})" title="Ver Credenciales y Detalle" type="button">
+                <i class="bi bi-key-fill"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = html;
+      actualizarSeleccion();
+    } catch (err) {
+      console.error('Error al cargar historial:', err);
+      if (!silencioso && tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Error al cargar el historial. Revisa la conexión con el servidor.</td></tr>`;
+      }
+    }
+  };
+
+  /* ------------------------------------------------------------------
+     5. MODAL VER CREDENCIALES Y DETALLE
+     ------------------------------------------------------------------ */
+  window.verDetalleAprobado = async function(id) {
+    const container = document.getElementById('detalleCredencialesContent');
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="text-center py-5 text-muted">
+        <div class="spinner-border text-primary spinner-border-sm mb-2" role="status"></div>
+        <div>Recuperando credenciales y perfiles de acceso...</div>
+      </div>
+    `;
+
+    const modalElement = document.getElementById('modalVerCredencialesRRHH');
+    if (!modalElement) return;
+
+    const modal = bootstrap.Modal.getInstance(modalElement) || new bootstrap.Modal(modalElement);
+    modal.show();
+
+    try {
+      const response = await fetch(`/api/solicitudes/${id}/preview`);
+      const data = await response.json();
+
+      if (response.ok) {
+        const esFN = data.es_fuera_de_nomina;
+        const nombreCompleto = `${data.nombre || 'Colaborador'} ${data.apellido || ''}`.trim();
+        const legajoTexto = esFN ? 'Personal Fuera de Nómina' : `Legajo #${data.legajo || 'N/A'}`;
+        const perfilTexto = data.perfil_ad || 'Operador';
+        const upnUsuario = data.usuario_ad || (data.email ? data.email.split('@')[0] : 'N/A');
+
+        let htmlBanner = `
+          <div class="d-flex align-items-center justify-content-between p-3 rounded-3 mb-3 bg-light border">
+            <div>
+              <span class="badge ${data.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success bg-opacity-10 text-success'} mb-1">
+                <i class="bi ${data.estado === 'PENDIENTE' ? 'bi-hourglass-split' : 'bi-check-circle-fill'} me-1"></i>
+                ${data.estado === 'PENDIENTE' ? 'En Proceso IT' : 'Proceso Concluido'}
+              </span>
+              <h6 class="fw-bold mb-0 text-dark">${nombreCompleto}</h6>
+              <small class="text-muted">${perfilTexto} • ${legajoTexto}</small>
+            </div>
+            <button class="btn btn-sm btn-outline-primary" id="btnCopiarCredencialesModal" onclick="copiarCredencialesJson()">
+              <i class="bi bi-clipboard me-1"></i> Copiar Todo
+            </button>
+          </div>
+        `;
+
+        let htmlCards = '';
+        if (esFN) {
+          htmlCards = `
+            <div class="col-12">
+              <div class="alert alert-info py-2 small mb-2 d-flex align-items-center">
+                <i class="bi bi-info-circle-fill fs-5 me-2"></i>
+                <div><strong>Empleado Fuera de Nómina:</strong> No posee cuentas de Active Directory corporativo ni VPN. Se generan accesos específicos para NeoTel y X-Lite.</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">USUARIO NEO</span>
+                <div class="fw-bold text-dark font-monospace">${data.usuario_neo || '-'}</div>
+                <small class="text-muted">Clave: <strong class="badge bg-white text-dark border">${data.clave_neo || '-'}</strong></small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">POSICIÓN X-LITE</span>
+                <div class="fw-bold text-dark font-monospace">${data.posicion_xlite || '-'}</div>
+                <small class="text-muted">Clave: <strong class="badge bg-white text-dark border">${data.clave_xlite || '-'}</strong></small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">RESPONSABLE ASIGNADO</span>
+                <div class="fw-semibold text-dark">${data.reporta_a || '-'}</div>
+                <small class="text-muted">Reporte Operativo Directo</small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">MODALIDAD CONTRACTUAL</span>
+                <div class="fw-semibold text-secondary"><i class="bi bi-briefcase me-1"></i> Contractor / Fuera de Nómina</div>
+                <small class="text-muted">Legajo Asignado: ${data.legajo || '7000+'}</small>
+              </div>
+            </div>
+          `;
+        } else {
+          htmlCards = `
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">USUARIO DE RED (UPN)</span>
+                <div class="fw-bold text-dark font-monospace">${upnUsuario}</div>
+                <small class="text-muted">Active Directory Domain User</small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">CONTRASEÑA PROVISIONAL</span>
+                <div class="d-flex align-items-center justify-content-between">
+                  <span class="fw-bold text-dark font-monospace">${data.clave_ad_mail || '-'}</span>
+                  <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">Requiere cambio</span>
+                </div>
+                <small class="text-muted">Válida para primer inicio</small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">BUZÓN OFFICE 365 / CORREO</span>
+                <div class="fw-bold text-dark text-truncate">${data.email || '-'}</div>
+                <small class="text-muted">Licencia Corporativa asignada</small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">GRUPO DE SEGURIDAD / PERFIL</span>
+                <div class="fw-bold text-dark">${perfilTexto}</div>
+                <small class="text-muted">OU y Políticas asignadas</small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">VPN FORTINET (100F)</span>
+                <div class="fw-bold text-dark font-monospace">${data.usuario_fortinet || '-'}</div>
+                <small class="text-muted">Clave (DNI): <strong class="badge bg-white text-dark border">${data.clave_fortinet || '-'}</strong></small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">USUARIO NEO</span>
+                <div class="fw-bold text-dark font-monospace">${data.usuario_neo || '-'}</div>
+                <small class="text-muted">Clave: <strong class="badge bg-white text-dark border">${data.clave_neo || '-'}</strong></small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">POSICIÓN X-LITE</span>
+                <div class="fw-bold text-dark font-monospace">${data.posicion_xlite || '-'}</div>
+                <small class="text-muted">Clave: <strong class="badge bg-white text-dark border">${data.clave_xlite || '-'}</strong></small>
+              </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <div class="credential-card">
+                <span class="key-tag">SUPERVISOR ASIGNADO</span>
+                <div class="fw-semibold text-dark">${data.reporta_a || '-'}</div>
+                <small class="text-muted">Líder directo de reporte</small>
+              </div>
+            </div>
+          `;
+        }
+
+        window._credencialesActualesModal = data;
+
+        container.innerHTML = `
+          ${htmlBanner}
+          <div class="row g-3">
+            ${htmlCards}
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-octagon-fill me-2"></i> ${data.detail || 'No se pudieron recuperar las credenciales de esta solicitud.'}
+          </div>
+        `;
+      }
+    } catch (err) {
+      container.innerHTML = `
+        <div class="alert alert-danger mb-0">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i> Error de conexión con el servidor al consultar credenciales.
+        </div>
+      `;
+    }
+  };
+
+  window.copiarCredencialesJson = function() {
+    const data = window._credencialesActualesModal;
+    if (!data) return;
+
+    let texto = `FICHA DE CREDENCIALES - ${data.nombre || ''} ${data.apellido || ''}\n`;
+    texto += `Legajo: ${data.legajo || 'N/A'}\n`;
+    texto += `Perfil: ${data.perfil_ad || ''}\n`;
+    texto += `Reporta a: ${data.reporta_a || ''}\n`;
+    texto += `------------------------------------\n`;
+    if (data.es_fuera_de_nomina) {
+      texto += `Modalidad: Fuera de Nómina (Contractor)\n`;
+      texto += `Usuario NEO: ${data.usuario_neo || '-'}\nClave NEO: ${data.clave_neo || '-'}\n`;
+      texto += `Posición X-Lite: ${data.posicion_xlite || '-'}\nClave X-Lite: ${data.clave_xlite || '-'}\n`;
+    } else {
+      texto += `Usuario AD: ${data.usuario_ad || '-'}\n`;
+      texto += `Clave Inicial: ${data.clave_ad_mail || '-'}\n`;
+      texto += `Correo: ${data.email || '-'}\n`;
+      texto += `VPN Fortinet: ${data.usuario_fortinet || '-'}\nClave VPN: ${data.clave_fortinet || '-'}\n`;
+      texto += `Usuario NEO: ${data.usuario_neo || '-'}\nClave NEO: ${data.clave_neo || '-'}\n`;
+      texto += `Posición X-Lite: ${data.posicion_xlite || '-'}\nClave X-Lite: ${data.clave_xlite || '-'}\n`;
+    }
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(texto).then(() => {
+        const btn = document.getElementById('btnCopiarCredencialesModal');
+        if (btn) {
+          const original = btn.innerHTML;
+          btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> ¡Copiado!';
+          btn.classList.replace('btn-outline-primary', 'btn-success');
+          setTimeout(() => {
+            btn.innerHTML = original;
+            btn.classList.replace('btn-success', 'btn-outline-primary');
+          }, 2000);
+        }
+      });
+    }
+  };
+
+  window.imprimirFichaCredenciales = function() {
+    window.print();
+  };
+
+  /* ------------------------------------------------------------------
+     6. SELECCIÓN Y EXPORTACIÓN A EXCEL
+     ------------------------------------------------------------------ */
+  window.toggleSelectAll = function(master) {
+    const checkboxes = document.querySelectorAll('.item-check:not(:disabled)');
+    checkboxes.forEach(cb => cb.checked = master.checked);
+    actualizarSeleccion();
+  };
+
+  window.actualizarSeleccion = function() {
+    const checkboxesHabilitados = document.querySelectorAll('.item-check:not(:disabled)');
+    const seleccionados = document.querySelectorAll('.item-check:checked');
+    const btnExportar = document.getElementById('btnExportarSeleccionados');
+    const cantLabel = document.getElementById('cantSeleccionados');
+    const checkAll = document.getElementById('checkAll');
+
+    if (cantLabel) cantLabel.textContent = seleccionados.length;
+
+    if (btnExportar) {
+      if (seleccionados.length > 0) {
+        btnExportar.classList.remove('d-none');
+      } else {
+        btnExportar.classList.add('d-none');
+      }
+    }
+
+    if (checkAll) {
+      if (checkboxesHabilitados.length > 0) {
+        checkAll.disabled = false;
+        checkAll.checked = (checkboxesHabilitados.length === seleccionados.length);
+      } else {
+        checkAll.checked = false;
+        checkAll.disabled = true;
+      }
+    }
+  };
+
+  window.exportarSeleccionados = async function() {
+    const seleccionados = Array.from(document.querySelectorAll('.item-check:checked')).map(cb => parseInt(cb.value));
+    if (seleccionados.length === 0) return;
+
+    const btnExportar = document.getElementById('btnExportarSeleccionados');
+    if (btnExportar) btnExportar.disabled = true;
+
+    try {
+      const response = await fetch('/api/solicitudes/exportar-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: seleccionados })
+      });
+
+      if (!response.ok) throw new Error('Error al generar la planilla Excel en el servidor.');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Reporte_Solicitudes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('No se pudo descargar el archivo Excel: ' + err.message);
+    } finally {
+      if (btnExportar) btnExportar.disabled = false;
+    }
+  };
+
+  /* ------------------------------------------------------------------
+     7. AUTO-REFRESCO / POLLING PERIÓDICO
+     ------------------------------------------------------------------ */
+  function iniciarPolling() {
+    if (pollingIntervalRRHH) clearInterval(pollingIntervalRRHH);
+    pollingIntervalRRHH = setInterval(() => {
+      if (!document.hidden) {
+        cargarMisSolicitudes(true);
+      }
+    }, 5000);
+  }
+
+})();
+</script>
+
 </body>
 </html>

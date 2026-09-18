@@ -1,6 +1,8 @@
 /* ==========================================
    VARIABLES GLOBALES Y CONFIGURACIÓN BASE
    ========================================== */
+window.__RRHH_MODULAR_LOADED__ = true;
+
 const PERFILES_PERMITIDOS = ["Operador", "Administrativo", "Supervisión", "Gerencia"];
 
 let checkboxFN = null;
@@ -12,11 +14,7 @@ let perfilPrevio = '';
 let datosExcelProcesados = [];
 
 document.addEventListener('DOMContentLoaded', () => {
-    checkboxFN = document.getElementById('es_fuera_de_nomina') || document.getElementById('esFueraNomina');
+    checkboxFN = document.getElementById('esFueraNomina');
     inputLegajo = document.getElementById('legajo');
     selectPerfil = document.getElementById('perfil_ad');
-
-    if (typeof cargarMisSolicitudes === 'function') {
-        cargarMisSolicitudes();
-    }
 });
