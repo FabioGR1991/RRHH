@@ -1,3 +1,5 @@
 Username;NombreCompleto;OU;Email;Perfil;MustChangePass
 ttestapellido;TestNombre TestApellido;OU=Operador,OU=Usuarios,DC=tandemtech,DC=com,DC=ar;ttestapellido@tandemtech.com.ar;Operador;True
 cvillagran;Carlos Villagran;OU=Administrativo,OU=Usuarios,DC=tandemtech,DC=com,DC=ar;cvillagran@tandemtech.com.ar;Administrativo;True
+mperez;Matias Perez;OU=Operador,OU=Usuarios,DC=tandemtech,DC=com,DC=ar;mperez@tandemtech.com.ar;Operador;True
+cbenitez;Cinthia Benítez;OU=Operador,OU=Usuarios,DC=tandemtech,DC=com,DC=ar;cbenitez@tandemtech.com.ar;Operador;True
