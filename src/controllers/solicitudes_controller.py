@@ -10,6 +10,7 @@ from typing import List, Optional
 
 from config.database import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -23,6 +24,7 @@ from src.services.solicitudes_import_service import procesar_importacion_masiva_
 from src.services.solicitudes_workflow_service import (
     aprobar_y_aprovisionar_solicitud_service,
     generar_preview_solicitud_service,
+    obtener_pdf_solicitud,
 )
 from src.services.zammad_service import crear_ticket_zammad
 
@@ -52,6 +54,7 @@ class ExportarSchema(BaseModel):
 # ==========================================
 # ENDPOINTS API
 # ==========================================
+
 @router.get("/reportantes/buscar")
 def buscar_reportantes(q: str = ""):
     """Devuelve coincidencias de correos/nombres de superiores almacenados en memoria."""
@@ -167,9 +170,37 @@ async def obtener_preview_solicitud(
 
 @router.post("/{solicitud_id}/aprobar")
 async def aprobar_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
-    """Aprueba la solicitud, aprovisiona servicios y notifica."""
+    """
+    Aprueba la solicitud, ejecuta la secuencia completa de aprovisionamiento
+    (AD → Gmail → NeoTel → FortiClient) y retorna las credenciales generadas
+    junto con el estado detallado por servicio.
+    """
     return await aprobar_y_aprovisionar_solicitud_service(
         solicitud_id=solicitud_id, db=db
+    )
+
+
+@router.get("/{solicitud_id}/descargar-pdf")
+def descargar_pdf_solicitud(solicitud_id: int, db: Session = Depends(get_db)):
+    """
+    Descarga el PDF de credenciales de una solicitud ya aprobada.
+    El archivo debe haber sido generado previamente durante el aprovisionamiento.
+
+    Returns:
+        FileResponse con el PDF para descarga directa del navegador.
+    """
+    pdf_path = obtener_pdf_solicitud(solicitud_id=solicitud_id, db=db)
+
+    import os
+    filename = os.path.basename(pdf_path)
+
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=filename,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
     )
 
 

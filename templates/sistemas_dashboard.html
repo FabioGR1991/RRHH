@@ -1,405 +1,2090 @@
 <!-- ===================================================================
-ARCHIVO: config/templates/sistemas_dashboard.html
-DESCRIPCIÓN: Panel de control para el equipo de Sistemas / IT.
+ARCHIVO: templates/sistemas_dashboard.html
+DESCRIPCIÓN: Panel de Administración y Aprovisionamiento de IT / Sistemas.
 Maneja:
  - Visualización en tiempo real de las solicitudes de altas enviadas por RRHH.
- - Botón para abrir el Modal de Previsualización de Credenciales.
- - Botón de Re-verificación en vivo para resolver colisiones de nombres/cuentas en batches.
- - Adaptación condicional del Modal para Empleados "Fuera de Nómina" (sin AD/Mail/VPN).
- - Ejecución de la aprobación final y aprovisionamiento de cuentas en los servicios MOCK/REAL.
- - Despliegue de Output con Credenciales creadas y opción de copiado al portapapeles.
- - Reapertura del Modal de Credenciales para registros ya procesados.
+ - Métricas y KPIs operacionales en vivo (Pendientes, En Proceso, Completados, Errores).
+ - Filtros rápidos por estado, búsqueda en vivo y paginación interactiva.
+ - Previsualización y re-verificación de credenciales propuestas por el orquestador.
+ - Stepper de ejecución en vivo con animación secuencial por servicio (AD -> Gmail -> NeoTel -> FortiClient).
+ - Salida de credenciales aprovisionadas con copiado individual, descarga de PDF y exportación a Excel.
 =================================================================== -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel IT - Aprovisionamiento</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Consola IT - Aprovisionamiento de Sistemas</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"/>
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+
+    <!-- FastAPI Jinja2 Static Hook -->
+    <link href="{{ url_for('static', path='css/custom.css') }}" rel="stylesheet"/>
+
+    <style>
+      :root {
+        --brand-dark: #0F172A;
+        --brand-dark-card: #1E293B;
+        --brand-primary: #2563EB;
+        --brand-primary-hover: #1D4ED8;
+        --brand-primary-soft: #EFF6FF;
+        --brand-success: #16A34A;
+        --brand-success-soft: #DCFCE7;
+        --brand-warning: #D97706;
+        --brand-warning-soft: #FEF3C7;
+        --brand-danger: #DC2626;
+        --brand-danger-soft: #FEE2E2;
+        --brand-info: #0284C7;
+        --brand-info-soft: #E0F2FE;
+        --bg-light: #F8FAFC;
+        --card-radius: 14px;
+      }
+
+      body {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: var(--bg-light);
+        color: #1E293B;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Navbar */
+      .navbar-custom {
+        background-color: var(--brand-dark);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.75rem 1.25rem;
+      }
+
+      .brand-badge-icon {
+        width: 38px;
+        height: 38px;
+        background: rgba(37, 99, 235, 0.25);
+        border: 1px solid rgba(37, 99, 235, 0.5);
+        color: #60A5FA;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        box-shadow: 0 0 15px rgba(37, 99, 235, 0.3);
+      }
+
+      /* Cards & Containers */
+      .custom-card {
+        border-radius: var(--card-radius);
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04), 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+      }
+
+      /* KPI Cards */
+      .kpi-card {
+        border-radius: var(--card-radius);
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        padding: 1rem 1.25rem;
+        box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.04);
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .kpi-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+      }
+
+      .kpi-card.active-filter {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 2px var(--brand-primary);
+      }
+
+      .kpi-icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+      }
+
+      /* Filtros Rápidos */
+      .filter-pill {
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        color: #475569;
+        font-weight: 600;
+        font-size: 0.8rem;
+        padding: 0.4rem 0.85rem;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+      }
+
+      .filter-pill:hover {
+        background: #F1F5F9;
+        border-color: #CBD5E1;
+        color: #1E293B;
+      }
+
+      .filter-pill.active {
+        background: var(--brand-dark);
+        border-color: var(--brand-dark);
+        color: #FFFFFF;
+      }
+
+      .filter-pill .badge-count {
+        font-size: 0.7rem;
+        padding: 0.15rem 0.45rem;
+        border-radius: 10px;
+        background: rgba(148, 163, 184, 0.2);
+        color: inherit;
+      }
+
+      .filter-pill.active .badge-count {
+        background: rgba(255, 255, 255, 0.25);
+        color: #FFFFFF;
+      }
+
+      /* Tabla Estilo IT */
+      .table-custom {
+        margin-bottom: 0;
+        font-size: 0.85rem;
+        vertical-align: middle;
+      }
+
+      .table-custom th {
+        background-color: #F8FAFC;
+        color: #475569;
+        font-weight: 700;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid #E2E8F0;
+        padding: 0.85rem 0.85rem;
+        white-space: nowrap;
+      }
+
+      .table-custom td {
+        padding: 0.85rem;
+        border-bottom: 1px solid #F1F5F9;
+        color: #334155;
+      }
+
+      .table-custom tr:hover td {
+        background-color: #F8FAFC;
+      }
+
+      /* Badges de Estado */
+      .status-badge {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        white-space: nowrap;
+      }
+
+      .status-badge-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+
+      .badge-PENDIENTE {
+        background-color: var(--brand-warning-soft);
+        color: #92400E;
+        border: 1px solid #FDE68A;
+      }
+      .badge-PENDIENTE .status-badge-dot {
+        background-color: #D97706;
+        box-shadow: 0 0 6px #D97706;
+        animation: pulse-amber 2s infinite;
+      }
+
+      .badge-EN_PROCESO {
+        background-color: var(--brand-info-soft);
+        color: #075985;
+        border: 1px solid #BAE6FD;
+      }
+      .badge-EN_PROCESO .status-badge-dot {
+        background-color: #0284C7;
+        animation: pulse-blue 1.5s infinite;
+      }
+
+      .badge-COMPLETADO, .badge-PROCESADO {
+        background-color: var(--brand-success-soft);
+        color: #166534;
+        border: 1px solid #BBF7D0;
+      }
+      .badge-COMPLETADO .status-badge-dot, .badge-PROCESADO .status-badge-dot {
+        background-color: #16A34A;
+      }
+
+      .badge-ERROR_PARCIAL {
+        background-color: var(--brand-danger-soft);
+        color: #991B1B;
+        border: 1px solid #FECACA;
+      }
+      .badge-ERROR_PARCIAL .status-badge-dot {
+        background-color: #DC2626;
+      }
+
+      .badge-RECHAZADO {
+        background-color: #F1F5F9;
+        color: #475569;
+        border: 1px solid #E2E8F0;
+      }
+
+      @keyframes pulse-amber {
+        0% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.4; transform: scale(0.85); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+
+      @keyframes pulse-blue {
+        0% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.85); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+
+      /* Avatares e Identificadores */
+      .user-avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #E2E8F0;
+        color: #334155;
+        font-weight: 700;
+        font-size: 0.8rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-transform: uppercase;
+        flex-shrink: 0;
+      }
+
+      /* Stepper de Progreso en Vivo */
+      .stepper-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: relative;
+        margin: 1.5rem 0 1rem 0;
+        padding: 0 1rem;
+      }
+
+      .stepper-progress-line {
+        position: absolute;
+        top: 20px;
+        left: 8%;
+        right: 8%;
+        height: 3px;
+        background-color: #E2E8F0;
+        z-index: 0;
+      }
+
+      .stepper-progress-fill {
+        height: 100%;
+        background-color: var(--brand-primary);
+        width: 0%;
+        transition: width 0.4s ease, background-color 0.4s ease;
+      }
+
+      .step-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+        width: 80px;
+      }
+
+      .step-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        font-weight: 700;
+        border: 3px solid #E2E8F0;
+        background: #FFFFFF;
+        color: #64748B;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      .step-item.active .step-circle {
+        border-color: var(--brand-primary);
+        color: var(--brand-primary);
+        box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.15);
+        background: #FFFFFF;
+      }
+
+      .step-item.done .step-circle {
+        border-color: var(--brand-success);
+        background: var(--brand-success);
+        color: #FFFFFF;
+      }
+
+      .step-item.error .step-circle {
+        border-color: var(--brand-danger);
+        background: var(--brand-danger);
+        color: #FFFFFF;
+      }
+
+      .step-item.omitido .step-circle {
+        border-color: #CBD5E1;
+        background: #F1F5F9;
+        color: #94A3B8;
+      }
+
+      .step-label {
+        font-size: 0.72rem;
+        text-align: center;
+        margin-top: 6px;
+        color: #64748B;
+        font-weight: 600;
+        line-height: 1.2;
+      }
+
+      .step-item.active .step-label { color: var(--brand-primary); font-weight: 700; }
+      .step-item.done .step-label   { color: var(--brand-success); font-weight: 700; }
+      .step-item.error .step-label  { color: var(--brand-danger); font-weight: 700; }
+
+      /* Modales Custom */
+      .modal-content-custom {
+        border-radius: 16px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+        overflow: hidden;
+      }
+
+      .service-card-modern {
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        height: 100%;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .service-card-modern:hover {
+        border-color: #CBD5E1;
+        box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
+      }
+
+      .cred-copy-pill {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.82rem;
+        background: #F1F5F9;
+        border: 1px solid #E2E8F0;
+        padding: 3px 8px;
+        border-radius: 6px;
+        color: #0F172A;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        user-select: all;
+        transition: all 0.15s ease;
+      }
+
+      .cred-copy-pill:hover {
+        background: #E2E8F0;
+        border-color: #CBD5E1;
+      }
+
+      /* Botones y Controles */
+      .btn-brand {
+        background-color: var(--brand-primary);
+        color: #FFFFFF;
+        border: none;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        transition: background-color 0.15s ease;
+      }
+
+      .btn-brand:hover {
+        background-color: var(--brand-primary-hover);
+        color: #FFFFFF;
+      }
+
+      .btn-action-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #E2E8F0;
+        background: #FFFFFF;
+        color: #2563EB;
+        transition: all 0.15s;
+        cursor: pointer;
+      }
+
+      .btn-action-icon:hover:not(:disabled) {
+        background-color: #EFF6FF;
+        border-color: #BFDBFE;
+        color: #1D4ED8;
+      }
+
+      /* Toast flotante de copiado */
+      #toastCopySuccess {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: #0F172A;
+        color: #FFFFFF;
+        padding: 10px 18px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+        z-index: 1080;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transform: translateY(100px);
+        opacity: 0;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        pointer-events: none;
+      }
+
+      #toastCopySuccess.show {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    </style>
 </head>
-<body class="bg-light">
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid px-4">
-            <a class="navbar-brand fw-bold" href="#"><i class="bi bi-cpu me-2"></i>Panel IT / Sistemas</a>
-            <div class="d-flex align-items-center">
-                <span class="text-light me-3 small"><i class="bi bi-person-circle me-1"></i> Administrador IT</span>
-                <a href="/logout" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> Salir</a>
-            </div>
-        </div>
-    </nav>
+<body>
 
-    <div class="container my-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="fw-bold mb-0">Solicitudes de Aprovisionamiento</h2>
-                <p class="text-muted mb-0">Gestión e integración de altas para nuevos empleados.</p>
-            </div>
-            <button onclick="cargarSolicitudes()" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
-            </button>
-        </div>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom">
+  <div class="container-fluid px-3">
+    <!-- Brand & Icon -->
+    <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="#">
+      <div class="brand-badge-icon">
+        <i class="bi bi-cpu-fill"></i>
+      </div>
+      <div>
+        <div class="fw-bold fs-6 lh-1 text-white">Consola IT &amp; Infraestructura</div>
+        <small class="text-secondary" style="font-size: 0.7rem;">Orquestador &amp; Aprovisionamiento</small>
+      </div>
+    </a>
 
-        <div id="alertBox" class="alert alert-success d-none mb-3" role="alert"></div>
+    <!-- Right Controls -->
+    <div class="d-flex align-items-center gap-2">
+      <!-- Sync Pulse Indicator -->
+      <div class="d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-3 bg-dark bg-opacity-50 border border-secondary border-opacity-25 text-light small" id="syncStatusIndicator">
+        <span class="status-badge-dot" style="background-color: #10B981; box-shadow: 0 0 6px #10B981;"></span>
+        <span style="font-size: 0.75rem;" id="syncLabel">Sincronización en vivo activa</span>
+      </div>
 
-        <!-- Tabla de Solicitudes -->
-        <div class="card shadow-sm border-0">
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">ID</th>
-                                <th>Empleado</th>
-                                <th>DNI / Legajo</th>
-                                <th>Perfil AD</th>
-                                <th>Estado</th>
-                                <th class="text-end pe-4">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tablaSolicitudes">
-                            <tr>
-                                <td colspan="6" class="text-center py-4 text-muted">Cargando solicitudes...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+      <!-- User Role Badge -->
+      <div class="d-flex align-items-center gap-2 bg-dark bg-opacity-50 px-2 py-1 rounded-3 border border-secondary border-opacity-25">
+        <span class="position-relative">
+          <i class="bi bi-person-gear text-light fs-5"></i>
+          <span class="position-absolute bottom-0 end-0 bg-success border border-dark rounded-circle" style="width: 8px; height: 8px;"></span>
+        </span>
+        <div class="d-none d-sm-block text-start lh-1">
+          <span class="text-white small fw-semibold d-block">Administrador IT</span>
+          <span class="text-info small" style="font-size: 0.65rem;">Rol: SISTEMAS</span>
         </div>
+      </div>
+
+      <!-- Logout -->
+      <a href="/logout" class="btn btn-outline-light btn-sm px-2 py-1 rounded-2 border-opacity-50 d-flex align-items-center gap-1" title="Cerrar Sesión">
+        <i class="bi bi-box-arrow-right"></i>
+        <span class="d-none d-md-inline" style="font-size: 0.8rem;">Salir</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Layout -->
+<main class="container-fluid px-3 py-3 flex-grow-1">
+
+  <!-- Alerta Global Dinámica -->
+  <div id="alertBox" class="alert alert-success d-none mb-3 alert-dismissible fade show" role="alert">
+    <span id="alertBoxText"></span>
+    <button type="button" class="btn-close" onclick="cerrarAlertaGlobal()"></button>
+  </div>
+
+  <!-- 1. SECCIÓN DE MÉTRICAS & KPIS SUPERIORES -->
+  <section class="row g-3 mb-3">
+    <!-- KPI: Total Solicitudes -->
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="kpi-card" onclick="filtrarPorEstadoRapido('TODOS')" id="kpi-card-todos" title="Mostrar todas las solicitudes">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Total Solicitudes</span>
+            <h3 class="fw-bold mb-0 mt-1 text-dark" id="kpiTotal">0</h3>
+            <small class="text-muted" style="font-size: 0.7rem;">Registros en cola</small>
+          </div>
+          <div class="kpi-icon-box bg-light text-primary">
+            <i class="bi bi-layers-fill"></i>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- MODAL DE PREVISUALIZACIÓN DE CREDENCIALES -->
-    <div class="modal fade" id="modalPreview" tabindex="-1" aria-labelledby="modalPreviewLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-dark text-white">
-                    <h5 class="modal-title" id="modalPreviewLabel"><i class="bi bi-eye me-2"></i>Previsualización de Credenciales</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small">Revise la propuesta generada automáticamente antes de confirmar el alta en los sistemas:</p>
-                    
-                    <div id="modalAlert" class="alert alert-danger d-none mb-3" role="alert"></div>
+    <!-- KPI: Pendientes -->
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="kpi-card" onclick="filtrarPorEstadoRapido('PENDIENTE')" id="kpi-card-pendientes" title="Filtrar solicitudes pendientes">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-warning-emphasis small fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Pendientes IT</span>
+            <h3 class="fw-bold mb-0 mt-1 text-warning-emphasis" id="kpiPendientes">0</h3>
+            <small class="text-warning-emphasis" style="font-size: 0.7rem;">Requieren aprobación</small>
+          </div>
+          <div class="kpi-icon-box bg-warning bg-opacity-15 text-warning">
+            <i class="bi bi-clock-history"></i>
+          </div>
+        </div>
+      </div>
+    </div>
 
-                    <div id="previewContent" class="row g-3">
-                        <!-- Se llena dinámicamente con JavaScript -->
-                        <div class="text-center py-4 text-muted">Generando preview...</div>
+    <!-- KPI: En Proceso -->
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="kpi-card" onclick="filtrarPorEstadoRapido('EN_PROCESO')" id="kpi-card-proceso" title="Filtrar solicitudes en proceso">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-primary small fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">En Ejecución</span>
+            <h3 class="fw-bold mb-0 mt-1 text-primary" id="kpiEnProceso">0</h3>
+            <small class="text-primary" style="font-size: 0.7rem;">Orquestando servicios</small>
+          </div>
+          <div class="kpi-icon-box bg-primary bg-opacity-15 text-primary">
+            <i class="bi bi-arrow-repeat"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI: Completados -->
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="kpi-card" onclick="filtrarPorEstadoRapido('COMPLETADO')" id="kpi-card-completados" title="Filtrar solicitudes completadas">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-success small fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Aprovisionados</span>
+            <h3 class="fw-bold mb-0 mt-1 text-success" id="kpiCompletados">0</h3>
+            <small class="text-success" style="font-size: 0.7rem;">Cuentas creadas</small>
+          </div>
+          <div class="kpi-icon-box bg-success bg-opacity-15 text-success">
+            <i class="bi bi-check2-circle"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI: Errores Parciales -->
+    <div class="col-12 col-sm-6 col-xl">
+      <div class="kpi-card" onclick="filtrarPorEstadoRapido('ERROR_PARCIAL')" id="kpi-card-errores" title="Filtrar solicitudes con error parcial">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <span class="text-danger small fw-bold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">Con Errores</span>
+            <h3 class="fw-bold mb-0 mt-1 text-danger" id="kpiErrores">0</h3>
+            <small class="text-danger" style="font-size: 0.7rem;">Atención requerida</small>
+          </div>
+          <div class="kpi-icon-box bg-danger bg-opacity-15 text-danger">
+            <i class="bi bi-exclamation-octagon-fill"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. TABLA PRINCIPAL Y HERRAMIENTAS DE BÚSQUEDA -->
+  <div class="custom-card p-3 p-md-4">
+    
+    <!-- Barra Superior de Herramientas -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom">
+      <div>
+        <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+          <i class="bi bi-table text-primary"></i> Cola Operativa de Altas
+        </h5>
+        <small class="text-muted">Aprobación, verificación de colisiones y ejecución por microservicios</small>
+      </div>
+
+      <!-- Acciones Globales -->
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <!-- Exportar Selección -->
+        <button id="btnExportarSeleccionados" onclick="exportarSeleccionados()" class="btn btn-success btn-sm d-none align-items-center gap-1">
+          <i class="bi bi-file-earmark-excel"></i> Exportar (<span id="cantSeleccionados">0</span>)
+        </button>
+
+        <!-- Toggle Auto-refresh -->
+        <button id="btnToggleAutoRefresh" onclick="toggleAutoRefresh()" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1" title="Pausar o reanudar auto-actualización">
+          <i class="bi bi-pause-fill" id="iconAutoRefresh"></i>
+          <span class="d-none d-md-inline" id="textAutoRefresh">Auto 10s</span>
+        </button>
+
+        <!-- Refrescar Manual -->
+        <button onclick="recargarManual()" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" id="btnRecargarManual" title="Refrescar lista ahora">
+          <i class="bi bi-arrow-clockwise" id="iconRecarga"></i>
+          <span>Actualizar</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Filtros de Búsqueda y Pestañas Rápidas -->
+    <div class="row g-2 mb-3 align-items-center">
+      <!-- Input de Búsqueda en Vivo -->
+      <div class="col-12 col-md-5 col-lg-4">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-light text-muted border-end-0">
+            <i class="bi bi-search"></i>
+          </span>
+          <input type="text" id="inputBusqueda" class="form-control border-start-0" 
+                 placeholder="Buscar por colaborador, DNI, legajo o supervisor..." 
+                 oninput="manejarBusqueda(this.value)" autocomplete="off">
+          <button class="btn btn-outline-secondary border-start-0 d-none" id="btnClearSearch" onclick="limpiarBusqueda()" type="button">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filtros Rápidos (Pills) -->
+      <div class="col-12 col-md-7 col-lg-8">
+        <div class="d-flex flex-wrap gap-1 justify-content-md-end align-items-center">
+          <button class="filter-pill active" data-filter="TODOS" onclick="aplicarFiltroEstado('TODOS', this)">
+            Todos <span class="badge-count" id="pillCountTodos">0</span>
+          </button>
+          <button class="filter-pill" data-filter="PENDIENTE" onclick="aplicarFiltroEstado('PENDIENTE', this)">
+            Pendientes <span class="badge-count" id="pillCountPendientes">0</span>
+          </button>
+          <button class="filter-pill" data-filter="EN_PROCESO" onclick="aplicarFiltroEstado('EN_PROCESO', this)">
+            En Proceso <span class="badge-count" id="pillCountProceso">0</span>
+          </button>
+          <button class="filter-pill" data-filter="COMPLETADO" onclick="aplicarFiltroEstado('COMPLETADO', this)">
+            Completados <span class="badge-count" id="pillCountCompletados">0</span>
+          </button>
+          <button class="filter-pill" data-filter="ERROR_PARCIAL" onclick="aplicarFiltroEstado('ERROR_PARCIAL', this)">
+            Con Error <span class="badge-count" id="pillCountErrores">0</span>
+          </button>
+          <button class="filter-pill" data-filter="FN" onclick="aplicarFiltroEstado('FN', this)">
+            <i class="bi bi-briefcase text-warning"></i> Fuera Nómina
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contenedor Responsive de Tabla -->
+    <div class="table-responsive rounded-3 border">
+      <table class="table table-custom table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="text-center" style="width: 38px;">
+              <input type="checkbox" class="form-check-input m-0" id="checkAll" onchange="toggleSelectAll(this)" title="Seleccionar todo">
+            </th>
+            <th style="width: 65px;">ID</th>
+            <th>Colaborador</th>
+            <th>Identificación</th>
+            <th>Perfil Asignado</th>
+            <th>Fecha Solicitud</th>
+            <th>Estado</th>
+            <th class="text-end pe-3" style="width: 170px;">Acciones IT</th>
+          </tr>
+        </thead>
+        <tbody id="tablaSolicitudes">
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <span class="spinner-border spinner-border-sm me-2 text-primary"></span> Consultando solicitudes al servidor...
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación y Resumen Inferior -->
+    <div class="d-flex flex-wrap align-items-center justify-content-between mt-3 pt-2 border-top gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <span class="small text-muted" id="resumenPaginacion">Mostrando 0 solicitudes</span>
+        <select id="selectPageSize" class="form-select form-select-sm" style="width: auto; font-size: 0.78rem;" onchange="cambiarTamanoPagina(this.value)">
+          <option value="10">10 por pág.</option>
+          <option value="25" selected>25 por pág.</option>
+          <option value="50">50 por pág.</option>
+          <option value="100">100 por pág.</option>
+        </select>
+      </div>
+
+      <nav aria-label="Navegación de páginas">
+        <ul class="pagination pagination-sm mb-0" id="paginationControls">
+          <!-- Botones de paginación inyectados por JS -->
+        </ul>
+      </nav>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- ================================================================
+     MODAL 1: PREVISUALIZACIÓN Y CONFIRMACIÓN DE ALTA
+================================================================ -->
+<div class="modal fade" id="modalPreview" tabindex="-1" aria-labelledby="modalPreviewLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-content-custom">
+            <!-- Modal Header Slate Dark -->
+            <div class="modal-header bg-dark text-white border-0 py-3 px-4" style="background-color: var(--brand-dark) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="brand-badge-icon" style="width: 34px; height: 34px; font-size: 1.1rem;">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold fs-6 mb-0" id="modalPreviewLabel">Previsualización de Credenciales IT</h5>
+                        <small class="text-light text-opacity-75" style="font-size: 0.72rem;">Verificación de cuentas y disponibilidad antes de impactar en infraestructura</small>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <input type="hidden" id="solicitudIdActual">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    
-                    <button type="button" id="btnRecalcular" onclick="recalcularPreview()" class="btn btn-outline-primary btn-sm">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" id="btnClosePreviewTop"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                
+                <!-- Alerta Interna del Modal -->
+                <div id="modalAlert" class="alert alert-danger d-none mb-3" role="alert"></div>
+
+                <!-- Ribbon de Datos del Empleado -->
+                <div id="colaboradorRibbon" class="p-3 rounded-3 bg-light border mb-3">
+                  <div class="row g-2 align-items-center">
+                    <div class="col-12 col-md-7">
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="user-avatar bg-primary text-white" id="previewAvatar">--</div>
+                        <div>
+                          <div class="fw-bold text-dark fs-6" id="previewNombreCompleto">Cargando...</div>
+                          <small class="text-muted" id="previewReportaA">Reporta a: -</small>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-12 col-md-5 text-md-end">
+                      <div class="small"><strong class="text-muted">DNI:</strong> <span id="previewDni">-</span> • <strong class="text-muted">Legajo:</strong> <span id="previewLegajo">-</span></div>
+                      <div id="previewPerfilBadge" class="mt-1"><span class="badge bg-secondary">-</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Stepper de Progreso en Vivo (Visible durante ejecución) -->
+                <div id="stepperContainer" class="d-none mb-4 p-3 rounded-3 border bg-light">
+                    <div class="text-center mb-2">
+                        <div class="spinner-border spinner-border-sm text-primary me-1" role="status"></div>
+                        <span class="fw-bold small text-dark" id="stepperEstadoTexto">Orquestando aprovisionamiento en microservicios...</span>
+                    </div>
+
+                    <div class="stepper-container">
+                        <div class="stepper-progress-line">
+                            <div id="progressBar" class="stepper-progress-fill"></div>
+                        </div>
+
+                        <!-- 1. AD -->
+                        <div class="step-item" id="step-ad">
+                            <div class="step-circle"><i class="bi bi-hdd-network"></i></div>
+                            <div class="step-label">Active<br>Directory</div>
+                        </div>
+
+                        <!-- 2. Gmail / Google Workspace -->
+                        <div class="step-item" id="step-gmail">
+                            <div class="step-circle"><i class="bi bi-envelope-at"></i></div>
+                            <div class="step-label">Google<br>Workspace</div>
+                        </div>
+
+                        <!-- 3. NeoTel -->
+                        <div class="step-item" id="step-neotel">
+                            <div class="step-circle"><i class="bi bi-telephone-inbound"></i></div>
+                            <div class="step-label">Telefonía<br>NeoTel</div>
+                        </div>
+
+                        <!-- 4. FortiGate VPN -->
+                        <div class="step-item" id="step-forti">
+                            <div class="step-circle"><i class="bi bi-shield-lock"></i></div>
+                            <div class="step-label">FortiGate<br>VPN 100F</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenido Dinámico de Propuesta de Credenciales -->
+                <div id="previewContent">
+                    <div class="text-center py-5 text-muted">
+                        <div class="spinner-border spinner-border-sm text-primary mb-2"></div>
+                        <div>Consultando Active Directory y verificando disponibilidad de cuentas...</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer bg-light border-top px-4 py-3 justify-content-between">
+                <input type="hidden" id="solicitudIdActual">
+                <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal" id="btnCancelarPreview">
+                    Cancelar
+                </button>
+
+                <div class="d-flex gap-2">
+                    <button type="button" id="btnRecalcular" onclick="recalcularPreview()" class="btn btn-outline-primary btn-sm px-3">
                         <i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad
                     </button>
 
-                    <button type="button" id="btnConfirmarAlta" onclick="confirmarAlta()" class="btn btn-success btn-sm">
-                        <i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta
+                    <button type="button" id="btnConfirmarAlta" onclick="confirmarAlta()" class="btn btn-brand btn-sm px-3">
+                        <i class="bi bi-rocket-takeoff-fill me-1"></i> Confirmar y Ejecutar Alta
                     </button>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- MODAL DE OUTPUT DE CREDENCIALES PROCESADAS -->
-    <div class="modal fade" id="modalOutputCredenciales" tabindex="-1" aria-labelledby="modalOutputLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-success text-white">
-                    <h5 class="modal-title" id="modalOutputLabel"><i class="bi bi-check-circle-fill me-2"></i>Alta Procesada Exitosamente</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted small mb-2">Las cuentas han sido aprovisionadas. Copie el resumen de credenciales generado:</p>
-                    <div class="mb-3">
-                        <textarea id="outputTextoFormateado" readonly class="form-control font-monospace text-dark bg-light" rows="10" style="font-size: 0.85rem; resize: none;"></textarea>
+<!-- ================================================================
+     MODAL 2: OUTPUT DE CREDENCIALES GENERADAS & ACCIONES
+================================================================ -->
+<div class="modal fade" id="modalOutputCredenciales" tabindex="-1" aria-labelledby="modalOutputLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content modal-content-custom">
+            <!-- Modal Header Dinámico -->
+            <div class="modal-header text-white border-0 py-3 px-4" id="modalOutputHeader" style="background-color: var(--brand-success) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 1.1rem;" id="modalOutputHeaderIcon">
+                        <i class="bi bi-check-lg"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold fs-6 mb-0" id="modalOutputLabel">Alta Procesada Exitosamente</h5>
+                        <small class="text-white text-opacity-75" style="font-size: 0.72rem;">Credenciales creadas y activas en infraestructura</small>
                     </div>
                 </div>
-                <div class="modal-footer justify-content-between">
-                    <button type="button" onclick="copiarOutputTexto()" class="btn btn-primary btn-sm">
-                        <i class="bi bi-clipboard-check me-1"></i> Copiar Texto Resumen
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close" onclick="recargarManual()"></button>
+            </div>
+
+            <div class="modal-body p-4">
+                
+                <!-- Badges de Estado por Microservicio -->
+                <div id="estadoServiciosContainer" class="mb-3 d-none p-3 rounded-3 bg-light border">
+                    <div class="small fw-bold text-muted mb-2 text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.05em;">
+                        Resultado de provisión por microservicio:
+                    </div>
+                    <div id="estadoServiciosBadges" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- Tarjetas Interactivas de Credenciales (Click to Copy) -->
+                <div id="credsCardsContainer" class="d-none mb-3"></div>
+
+                <!-- Resumen en Texto Plano Formateado -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-bold text-muted mb-0">Resumen integral para comunicación interna:</label>
+                        <button class="btn btn-link btn-sm p-0 text-decoration-none text-primary" onclick="copiarOutputTexto()">
+                            <i class="bi bi-clipboard me-1"></i>Copiar todo
+                        </button>
+                    </div>
+                    <textarea id="outputTextoFormateado" readonly class="form-control font-monospace text-dark bg-light"
+                              rows="8" style="font-size: 0.8rem; resize: none; border-radius: 8px;"></textarea>
+                </div>
+
+            </div>
+
+            <!-- Footer Botonera -->
+            <div class="modal-footer bg-light border-top px-4 py-3 justify-content-between flex-wrap gap-2">
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" onclick="copiarOutputTexto()" class="btn btn-primary btn-sm px-3">
+                        <i class="bi bi-clipboard-check me-1"></i> Copiar Resumen
                     </button>
-                    <button type="button" class="btn btn-dark btn-sm" data-bs-dismiss="modal" onclick="cargarSolicitudes()">
-                        Entendido / Cerrar
+                    <button type="button" id="btnDescargarPDF" onclick="descargarPDF()" class="btn btn-outline-danger btn-sm px-3 d-none">
+                        <i class="bi bi-file-earmark-pdf-fill me-1"></i> Descargar PDF
+                    </button>
+                    <button type="button" id="btnExportarCSV" onclick="exportarCSV()" class="btn btn-outline-success btn-sm px-3">
+                        <i class="bi bi-file-earmark-spreadsheet-fill me-1"></i> Exportar a Excel
                     </button>
                 </div>
+                <button type="button" class="btn btn-dark btn-sm px-3" data-bs-dismiss="modal" onclick="recargarManual()">
+                    Finalizar y Cerrar
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Toast Flotante de Confirmación de Copiado -->
+<div id="toastCopySuccess">
+  <i class="bi bi-check-circle-fill text-success"></i>
+  <span id="toastCopyText">Copiado al portapapeles</span>
+</div>
 
-    <script>
-        // Objeto global para almacenar la previsualización activa
-        let previewActualCache = null;
+<!-- Bootstrap 5 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-        async function cargarSolicitudes() {
-            try {
-                const response = await fetch('/api/solicitudes');
-                const data = await response.json();
-                const tbody = document.getElementById('tablaSolicitudes');
-                tbody.innerHTML = '';
+<!-- ================================================================
+     LÓGICA JAVASCRIPT DEL DASHBOARD IT
+================================================================ -->
+<script>
+// ================================================================
+// ESTADO GLOBAL DE LA APLICACIÓN
+// ================================================================
+let todasLasSolicitudes = [];
+let solicitudesFiltradas = [];
+let previewActualCache = null;
+let solicitudIdActualParaPDF = null;
 
-                if (!Array.isArray(data) || data.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No hay solicitudes registradas aún.</td></tr>`;
-                    return;
-                }
+// Paginación y Filtros
+let paginaActual = 1;
+let elementosPorPagina = 25;
+let filtroEstadoActivo = 'TODOS';
+let terminoBusqueda = '';
 
-                data.forEach(sol => {
-                    const badgeClass = sol.estado === 'PENDIENTE' ? 'bg-warning text-dark' : 'bg-success';
-                    const fnBadge = sol.es_fuera_de_nomina ? '<span class="badge bg-warning text-dark ms-1">FN</span>' : '';
+// Control de Auto-refresco
+let autoRefreshActivo = true;
+let intervaloAutoRefresh = null;
+const AUTO_REFRESH_MS = 10000;
 
-                    tbody.innerHTML += `
-                        <tr>
-                            <td class="ps-4 fw-bold">#${sol.id}</td>
-                            <td>
-                                <div class="fw-bold">${sol.nombre} ${sol.apellido}</div>
-                                <div class="small text-muted">Reporta a: ${sol.reporta_a || 'N/A'}</div>
-                            </td>
-                            <td>
-                                <div class="small">DNI: ${sol.dni}</div>
-                                <div class="small text-muted">Legajo: ${sol.legajo}${fnBadge}</div>
-                            </td>
-                            <td><span class="badge bg-secondary">${sol.perfil_ad || sol.perfil}</span></td>
-                            <td><span class="badge ${badgeClass}">${sol.estado}</span></td>
-                            <td class="text-end pe-4">
-                                ${sol.estado === 'PENDIENTE' 
-                                    ? `<button onclick="abrirPreview(${sol.id})" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-search me-1"></i> Previsualizar</button>` 
-                                    : `<button onclick="verCredenciales(${sol.id})" class="btn btn-sm btn-outline-success"><i class="bi bi-key-fill me-1"></i> Ver Credenciales</button>`}
-                            </td>
-                        </tr>
-                    `;
-                });
-            } catch (err) {
-                console.error('Error cargando solicitudes:', err);
-            }
+// Conjunto de IDs seleccionados para acciones en lote
+const solicitudesSeleccionadas = new Set();
+
+// Mapeo de Steps para Orquestador
+const STEPS_MAP = {
+    'active_directory': 'step-ad',
+    'google_workspace': 'step-gmail',
+    'neotel':           'step-neotel',
+    'forticlient':      'step-forti'
+};
+
+// ================================================================
+// INICIALIZACIÓN
+// ================================================================
+document.addEventListener('DOMContentLoaded', () => {
+    cargarSolicitudes();
+    iniciarAutoRefresh();
+});
+
+function iniciarAutoRefresh() {
+    if (intervaloAutoRefresh) clearInterval(intervaloAutoRefresh);
+    intervaloAutoRefresh = setInterval(() => {
+        if (autoRefreshActivo && !document.getElementById('modalPreview').classList.contains('show') && !document.getElementById('modalOutputCredenciales').classList.contains('show')) {
+            cargarSolicitudes(false);
+        }
+    }, AUTO_REFRESH_MS);
+}
+
+function toggleAutoRefresh() {
+    autoRefreshActivo = !autoRefreshActivo;
+    const btnIcon = document.getElementById('iconAutoRefresh');
+    const btnText = document.getElementById('textAutoRefresh');
+    const syncStatus = document.getElementById('syncStatusIndicator');
+
+    if (autoRefreshActivo) {
+        btnIcon.className = 'bi bi-pause-fill';
+        btnText.innerText = 'Auto 10s';
+        if (syncStatus) syncStatus.classList.remove('opacity-50');
+        mostrarToast('Sincronización automática activada (10s)');
+    } else {
+        btnIcon.className = 'bi bi-play-fill';
+        btnText.innerText = 'Pausado';
+        if (syncStatus) syncStatus.classList.add('opacity-50');
+        mostrarToast('Sincronización en pausa');
+    }
+}
+
+function recargarManual() {
+    const icon = document.getElementById('iconRecarga');
+    if (icon) icon.classList.add('bi-spin');
+    cargarSolicitudes(true).finally(() => {
+        setTimeout(() => {
+            if (icon) icon.classList.remove('bi-spin');
+        }, 500);
+    });
+}
+
+// ================================================================
+// CARGA Y PARSEO DE SOLICITUDES DESDE EL ENDPOINT
+// ================================================================
+async function cargarSolicitudes(mostrarLoading = true) {
+    const tbody = document.getElementById('tablaSolicitudes');
+    if (mostrarLoading && (!todasLasSolicitudes || todasLasSolicitudes.length === 0)) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">
+            <span class="spinner-border spinner-border-sm me-2 text-primary"></span>Cargando solicitudes del sistema...
+        </td></tr>`;
+    }
+
+    try {
+        const response = await fetch('/api/solicitudes');
+        if (response.status === 401 || response.status === 403) {
+            window.location.href = '/';
+            return;
         }
 
-        async function abrirPreview(id, abrirModal = true) {
-            document.getElementById('solicitudIdActual').value = id;
-            const container = document.getElementById('previewContent');
-            const alertBox = document.getElementById('modalAlert');
-            
-            alertBox.classList.add('d-none');
-            alertBox.innerText = '';
-            container.innerHTML = `<div class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Calculando datos y consultando disponibilidad...</div>`;
-            
-            if (abrirModal) {
-                const modalEl = document.getElementById('modalPreview');
-                let modalInstance = bootstrap.Modal.getInstance(modalEl);
-                if (!modalInstance) {
-                    modalInstance = new bootstrap.Modal(modalEl);
-                }
-                modalInstance.show();
-            }
+        if (!response.ok) throw new Error('Error en el servidor al consultar solicitudes');
 
-            try {
-                const response = await fetch(`/api/solicitudes/${id}/preview`);
-                const data = await response.json();
+        const data = await response.json();
+        todasLasSolicitudes = Array.isArray(data) ? data : [];
 
-                if (response.ok) {
-                    previewActualCache = data; // Almacenamos respuesta completa
-                    const esFueraDeNomina = data.es_fuera_de_nomina;
+        // Actualizar KPIs y Filtros
+        actualizarMetricasKPIs(todasLasSolicitudes);
+        aplicarFiltrosYRenderizar();
 
-                    if (esFueraDeNomina) {
-                        container.innerHTML = `
-                            <div class="col-12">
-                                <div class="alert alert-info py-2 small mb-2">
-                                    <i class="bi bi-info-circle-fill me-1"></i> <strong>Empleado Fuera de Nómina:</strong> No se generarán cuentas de Active Directory, Correo Gmail ni VPN Fortinet.
-                                </div>
-                            </div>
+    } catch (err) {
+        console.error('Error cargando solicitudes:', err);
+        if (todasLasSolicitudes.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-danger">
+                <i class="bi bi-wifi-off me-1"></i> No se pudo conectar con el servidor API. Reintentando...
+            </td></tr>`;
+        }
+    }
+}
 
-                            <!-- NEO -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
-                            </div>
+// ================================================================
+// CÁLCULO DE KPIS Y MÉTRICAS OPERATIVAS
+// ================================================================
+function actualizarMetricasKPIs(solicitudes) {
+    let pendientes = 0;
+    let enProceso = 0;
+    let completados = 0;
+    let errores = 0;
 
-                            <!-- X-LITE / POSICIÓN -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
-                            </div>
-                        `;
-                    } else {
-                        container.innerHTML = `
-                            <!-- AD / MAIL -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Usuario AD / Correo</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.usuario_ad || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave predeterminada: <span class="badge bg-light text-dark border">${data.clave_ad_mail || ''}</span></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Mail Corporativo</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.email || ''}" readonly>
-                            </div>
+    solicitudes.forEach(s => {
+        const est = (s.estado || 'PENDIENTE').toUpperCase();
+        if (est === 'PENDIENTE') pendientes++;
+        else if (est === 'EN_PROCESO') enProceso++;
+        else if (['COMPLETADO', 'PROCESADO'].includes(est)) completados++;
+        else if (['ERROR_PARCIAL', 'RECHAZADO', 'ERROR'].includes(est)) errores++;
+    });
 
-                            <!-- FORTINET -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Usuario Fortinet (VPN 100 F)</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.usuario_fortinet || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave (DNI): <span class="badge bg-light text-dark border">${data.clave_fortinet || ''}</span></div>
-                            </div>
+    document.getElementById('kpiTotal').innerText = solicitudes.length;
+    document.getElementById('kpiPendientes').innerText = pendientes;
+    document.getElementById('kpiEnProceso').innerText = enProceso;
+    document.getElementById('kpiCompletados').innerText = completados;
+    document.getElementById('kpiErrores').innerText = errores;
 
-                            <!-- NEO -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold small mb-1">Usuario NEO</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.usuario_neo || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_neo || ''}</span></div>
-                            </div>
+    // Actualizar contadores en los pills
+    document.getElementById('pillCountTodos').innerText = solicitudes.length;
+    document.getElementById('pillCountPendientes').innerText = pendientes;
+    document.getElementById('pillCountProceso').innerText = enProceso;
+    document.getElementById('pillCountCompletados').innerText = completados;
+    document.getElementById('pillCountErrores').innerText = errores;
+}
 
-                            <!-- X-LITE -->
-                            <div class="col-md-12">
-                                <label class="form-label fw-bold small mb-1">Dispositivo posición (X-Lite)</label>
-                                <input type="text" class="form-control form-control-sm" value="${data.posicion_xlite || ''}" readonly>
-                                <div class="form-text text-muted font-monospace small">Clave: <span class="badge bg-light text-dark border">${data.clave_xlite || ''}</span></div>
-                            </div>
-                        `;
-                    }
-                } else {
-                    container.innerHTML = `<div class="alert alert-danger">Error: ${data.detail || 'Desconocido'}</div>`;
-                }
-            } catch (err) {
-                container.innerHTML = `<div class="alert alert-danger">Error de conexión al generar el preview.</div>`;
-            }
+// ================================================================
+// FILTRADO Y BÚSQUEDA EN TIEMPO REAL
+// ================================================================
+function filtrarPorEstadoRapido(estado) {
+    filtroEstadoActivo = estado;
+    // Sincronizar botón de filtro activo
+    document.querySelectorAll('.filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.getAttribute('data-filter') === estado);
+    });
+    // Destacar tarjeta KPI
+    document.querySelectorAll('.kpi-card').forEach(kpi => kpi.classList.remove('active-filter'));
+    const kpiMap = {
+        'TODOS': 'kpi-card-todos',
+        'PENDIENTE': 'kpi-card-pendientes',
+        'EN_PROCESO': 'kpi-card-proceso',
+        'COMPLETADO': 'kpi-card-completados',
+        'ERROR_PARCIAL': 'kpi-card-errores'
+    };
+    if (kpiMap[estado]) {
+        const el = document.getElementById(kpiMap[estado]);
+        if (el) el.classList.add('active-filter');
+    }
+
+    paginaActual = 1;
+    aplicarFiltrosYRenderizar();
+}
+
+function aplicarFiltroEstado(estado, btnElement) {
+    document.querySelectorAll('.filter-pill').forEach(pill => pill.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+    filtroEstadoActivo = estado;
+    paginaActual = 1;
+    aplicarFiltrosYRenderizar();
+}
+
+function manejarBusqueda(val) {
+    terminoBusqueda = (val || '').trim().toLowerCase();
+    const btnClear = document.getElementById('btnClearSearch');
+    if (btnClear) {
+        btnClear.classList.toggle('d-none', !terminoBusqueda);
+    }
+    paginaActual = 1;
+    aplicarFiltrosYRenderizar();
+}
+
+function limpiarBusqueda() {
+    const input = document.getElementById('inputBusqueda');
+    if (input) input.value = '';
+    manejarBusqueda('');
+}
+
+function aplicarFiltrosYRenderizar() {
+    solicitudesFiltradas = todasLasSolicitudes.filter(sol => {
+        // 1. Filtro por Estado
+        const est = (sol.estado || 'PENDIENTE').toUpperCase();
+        if (filtroEstadoActivo === 'PENDIENTE' && est !== 'PENDIENTE') return false;
+        if (filtroEstadoActivo === 'EN_PROCESO' && est !== 'EN_PROCESO') return false;
+        if (filtroEstadoActivo === 'COMPLETADO' && !['COMPLETADO', 'PROCESADO'].includes(est)) return false;
+        if (filtroEstadoActivo === 'ERROR_PARCIAL' && !['ERROR_PARCIAL', 'RECHAZADO', 'ERROR'].includes(est)) return false;
+        if (filtroEstadoActivo === 'FN' && !sol.es_fuera_de_nomina) return false;
+
+        // 2. Filtro por Búsqueda de Texto
+        if (terminoBusqueda) {
+            const nomCompleto = `${sol.nombre || ''} ${sol.apellido || ''}`.toLowerCase();
+            const dni = String(sol.dni || '').toLowerCase();
+            const leg = String(sol.legajo || '').toLowerCase();
+            const sup = String(sol.reporta_a || '').toLowerCase();
+            const id = String(sol.id || '');
+            const match = nomCompleto.includes(terminoBusqueda) ||
+                          dni.includes(terminoBusqueda) ||
+                          leg.includes(terminoBusqueda) ||
+                          sup.includes(terminoBusqueda) ||
+                          id.includes(terminoBusqueda);
+            if (!match) return false;
         }
 
-        async function recalcularPreview() {
-            const id = document.getElementById('solicitudIdActual').value;
-            const btn = document.getElementById('btnRecalcular');
-            
-            btn.disabled = true;
-            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Re-verificando...`;
+        return true;
+    });
 
-            await abrirPreview(id, false);
+    renderizarTabla();
+}
 
-            btn.disabled = false;
-            btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad`;
+// ================================================================
+// RENDERIZADO DE LA TABLA Y PAGINACIÓN
+// ================================================================
+function renderizarTabla() {
+    const tbody = document.getElementById('tablaSolicitudes');
+    tbody.innerHTML = '';
+
+    if (solicitudesFiltradas.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted">
+            <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+            No se encontraron solicitudes con los filtros aplicados.
+        </td></tr>`;
+        actualizarPaginacion(0, 0, 0);
+        return;
+    }
+
+    const totalElementos = solicitudesFiltradas.length;
+    const totalPaginas = Math.ceil(totalElementos / elementosPorPagina) || 1;
+    if (paginaActual > totalPaginas) paginaActual = totalPaginas;
+
+    const inicio = (paginaActual - 1) * elementosPorPagina;
+    const fin = Math.min(inicio + elementosPorPagina, totalElementos);
+    const paginaItems = solicitudesFiltradas.slice(inicio, fin);
+
+    paginaItems.forEach(sol => {
+        const id = sol.id;
+        const nombreCompleto = `${sol.nombre || ''} ${sol.apellido || ''}`.trim();
+        const iniciales = ((sol.nombre ? sol.nombre[0] : '') + (sol.apellido ? sol.apellido[0] : '')).toUpperCase() || 'ID';
+        const estado = (sol.estado || 'PENDIENTE').toUpperCase();
+        const esFN = Boolean(sol.es_fuera_de_nomina);
+        const esProcesado = ['COMPLETADO', 'PROCESADO', 'ERROR_PARCIAL'].includes(estado);
+        const estaSeleccionado = solicitudesSeleccionadas.has(id);
+
+        // Badge de Estado
+        const badgeHtml = `
+          <span class="status-badge badge-${estado}">
+            <span class="status-badge-dot"></span> ${formatearEstado(estado)}
+          </span>`;
+
+        // Badge Fuera de Nómina
+        const fnBadge = esFN
+            ? `<span class="badge bg-warning bg-opacity-25 text-warning-emphasis border border-warning border-opacity-50 ms-1 px-1 py-0" style="font-size: 0.65rem;" title="Personal Fuera de Nómina / Contractor">FN</span>`
+            : '';
+
+        // Formato Fecha
+        const fechaFormateada = formatearFecha(sol.fecha_solicitud);
+
+        // Botonera de Acciones
+        let accionBtn = '';
+        if (estado === 'PENDIENTE') {
+            accionBtn = `
+              <button onclick="abrirPreview(${id})" class="btn btn-sm btn-brand d-inline-flex align-items-center gap-1 py-1 px-2" title="Revisar propuesta y ejecutar alta">
+                <i class="bi bi-eye-fill"></i> Previsualizar
+              </button>`;
+        } else if (estado === 'EN_PROCESO') {
+            accionBtn = `
+              <button class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 py-1 px-2 disabled">
+                <span class="spinner-border spinner-border-sm" role="status"></span> Ejecutando...
+              </button>`;
+        } else if (esProcesado) {
+            accionBtn = `
+              <div class="d-inline-flex align-items-center gap-1">
+                <button onclick="verCredenciales(${id})" class="btn btn-sm btn-outline-success d-inline-flex align-items-center gap-1 py-1 px-2" title="Ver credenciales activas">
+                  <i class="bi bi-key-fill"></i> Ver Credenciales
+                </button>
+                <button onclick="descargarPDFDirecto(${id})" class="btn-action-icon text-danger" title="Descargar PDF de bienvenida">
+                  <i class="bi bi-file-earmark-pdf-fill"></i>
+                </button>
+              </div>`;
+        } else {
+            accionBtn = `
+              <button onclick="abrirPreview(${id})" class="btn btn-sm btn-outline-secondary py-1 px-2">
+                Revisar
+              </button>`;
         }
 
-        async function confirmarAlta() {
-            const id = document.getElementById('solicitudIdActual').value;
-            const btnConfirmar = document.getElementById('btnConfirmarAlta');
-            const btnRecalcular = document.getElementById('btnRecalcular');
-            const alertBox = document.getElementById('modalAlert');
+        // Perfil AD estilizado
+        const perfilAD = sol.perfil_ad || sol.perfil || 'Operador';
+        const perfilColor = obtenerColorPerfil(perfilAD);
 
-            btnConfirmar.disabled = true;
-            btnRecalcular.disabled = true;
-            btnConfirmar.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Procesando Alta...`;
+        const tr = document.createElement('tr');
+        tr.className = estaSeleccionado ? 'table-active' : '';
+        tr.innerHTML = `
+          <td class="text-center">
+            <input type="checkbox" class="form-check-input row-checkbox m-0" 
+                   data-id="${id}" ${estaSeleccionado ? 'checked' : ''} 
+                   onchange="toggleSeleccionRow(${id}, this.checked)">
+          </td>
+          <td class="fw-bold text-muted ps-2">#${id}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="user-avatar">${iniciales}</div>
+              <div>
+                <div class="fw-bold text-dark">${nombreCompleto}</div>
+                <small class="text-muted d-block" style="font-size: 0.72rem;">
+                  <i class="bi bi-person-check me-1"></i>Reporta a: ${sol.reporta_a || 'No especificado'}
+                </small>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="fw-semibold text-dark">Legajo: ${sol.legajo || '-'}${fnBadge}</div>
+            <small class="text-muted" style="font-size: 0.72rem;">DNI: ${sol.dni || '-'}</small>
+          </td>
+          <td>
+            <span class="badge ${perfilColor} fw-semibold">${perfilAD}</span>
+          </td>
+          <td>
+            <small class="text-muted">${fechaFormateada}</small>
+          </td>
+          <td>${badgeHtml}</td>
+          <td class="text-end pe-3">${accionBtn}</td>
+        `;
 
-            try {
-                const response = await fetch(`/api/solicitudes/${id}/aprobar`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+        tbody.appendChild(tr);
+    });
 
-                const data = await response.json();
+    actualizarPaginacion(inicio + 1, fin, totalElementos);
+    sincronizarCheckAllHeader();
+}
 
-                // Detección de colisión / conflicto (HTTP 409 Conflict)
-                if (response.status === 409) {
-                    alertBox.innerText = `Conflicto de duplicidad detectado: ${data.detail || 'Las credenciales ya han sido asignadas'}. Recalculando nueva propuesta...`;
-                    alertBox.classList.remove('d-none');
-                    
-                    // Se re-ejecuta la previsualización en segundo plano para traer credenciales libres
-                    await abrirPreview(id, false);
-                    return;
-                }
+function formatearEstado(estado) {
+    const mapa = {
+        'PENDIENTE': 'Pendiente',
+        'EN_PROCESO': 'En Proceso',
+        'COMPLETADO': 'Completado',
+        'PROCESADO': 'Aprovisionado',
+        'ERROR_PARCIAL': 'Error Parcial',
+        'RECHAZADO': 'Rechazado'
+    };
+    return mapa[estado] || estado;
+}
 
-                if (response.ok) {
-                    // Cerrar modal de preview
-                    const modalEl = document.getElementById('modalPreview');
-                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
-                    if (modalInstance) modalInstance.hide();
+function formatearFecha(fechaStr) {
+    if (!fechaStr) return '-';
+    try {
+        const d = new Date(fechaStr);
+        if (isNaN(d.getTime())) return fechaStr;
+        return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    } catch {
+        return fechaStr;
+    }
+}
 
-                    // Si el backend devuelve las credenciales finales en la respuesta, usamos esa fuente de verdad
-                    const credencialesFinales = (data && data.credenciales) ? data.credenciales : previewActualCache;
-                    mostrarModalOutput(credencialesFinales);
-                } else {
-                    alertBox.innerText = 'Error al procesar: ' + (data.detail || 'Error desconocido');
-                    alertBox.classList.remove('d-none');
-                }
-            } catch (err) {
-                alertBox.innerText = 'Error de conexión con el servidor al procesar el alta.';
-                alertBox.classList.remove('d-none');
-            } finally {
-                btnConfirmar.disabled = false;
-                btnRecalcular.disabled = false;
-                btnConfirmar.innerHTML = `<i class="bi bi-check-circle me-1"></i> Confirmar y Ejecutar Alta`;
-            }
+function obtenerColorPerfil(perfil) {
+    const p = (perfil || '').toLowerCase();
+    if (p.includes('admin') || p.includes('geren')) return 'bg-dark text-white';
+    if (p.includes('supervis') || p.includes('leader')) return 'bg-primary text-white';
+    if (p.includes('administrativ')) return 'bg-info bg-opacity-25 text-info-emphasis border border-info border-opacity-50';
+    return 'bg-light text-dark border';
+}
+
+// ================================================================
+// CONTROLES DE PAGINACIÓN
+// ================================================================
+function actualizarPaginacion(inicio, fin, total) {
+    const resumenEl = document.getElementById('resumenPaginacion');
+    if (resumenEl) {
+        resumenEl.innerText = total > 0 ? `Mostrando ${inicio} a ${fin} de ${total} solicitudes` : 'Mostrando 0 solicitudes';
+    }
+
+    const paginationControls = document.getElementById('paginationControls');
+    paginationControls.innerHTML = '';
+    if (total <= elementosPorPagina) return;
+
+    const totalPaginas = Math.ceil(total / elementosPorPagina);
+
+    // Botón Anterior
+    const liPrev = document.createElement('li');
+    liPrev.className = `page-item ${paginaActual === 1 ? 'disabled' : ''}`;
+    liPrev.innerHTML = `<button class="page-link" onclick="cambiarPagina(${paginaActual - 1})"><i class="bi bi-chevron-left"></i></button>`;
+    paginationControls.appendChild(liPrev);
+
+    // Botones de Páginas (Máximo 5 páginas visibles)
+    let startPage = Math.max(1, paginaActual - 2);
+    let endPage = Math.min(totalPaginas, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let p = startPage; p <= endPage; p++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${p === paginaActual ? 'active' : ''}`;
+        li.innerHTML = `<button class="page-link" onclick="cambiarPagina(${p})">${p}</button>`;
+        paginationControls.appendChild(li);
+    }
+
+    // Botón Siguiente
+    const liNext = document.createElement('li');
+    liNext.className = `page-item ${paginaActual === totalPaginas ? 'disabled' : ''}`;
+    liNext.innerHTML = `<button class="page-link" onclick="cambiarPagina(${paginaActual + 1})"><i class="bi bi-chevron-right"></i></button>`;
+    paginationControls.appendChild(liNext);
+}
+
+function cambiarPagina(nuevaPagina) {
+    const totalPaginas = Math.ceil(solicitudesFiltradas.length / elementosPorPagina);
+    if (nuevaPagina < 1 || nuevaPagina > totalPaginas) return;
+    paginaActual = nuevaPagina;
+    renderizarTabla();
+}
+
+function cambiarTamanoPagina(nuevoTamano) {
+    elementosPorPagina = parseInt(nuevoTamano, 10) || 25;
+    paginaActual = 1;
+    renderizarTabla();
+}
+
+// ================================================================
+// SELECCIÓN MÚLTIPLE Y EXPORTACIÓN EN LOTE
+// ================================================================
+function toggleSelectAll(checkMaster) {
+    const checked = checkMaster.checked;
+    solicitudesFiltradas.forEach(s => {
+        if (checked) {
+            solicitudesSeleccionadas.add(s.id);
+        } else {
+            solicitudesSeleccionadas.delete(s.id);
         }
+    });
+    actualizarBotoneraSeleccion();
+    renderizarTabla();
+}
 
-        async function verCredenciales(id) {
-            try {
-                const response = await fetch(`/api/solicitudes/${id}/preview`);
-                const data = await response.json();
+function toggleSeleccionRow(id, isChecked) {
+    if (isChecked) {
+        solicitudesSeleccionadas.add(id);
+    } else {
+        solicitudesSeleccionadas.delete(id);
+    }
+    actualizarBotoneraSeleccion();
+    sincronizarCheckAllHeader();
+}
 
-                if (response.ok) {
-                    mostrarModalOutput(data);
-                } else {
-                    alert('No se pudieron recuperar las credenciales: ' + (data.detail || 'Error desconocido'));
-                }
-            } catch (err) {
-                console.error('Error recuperando credenciales:', err);
-                alert('Error al conectar con el servidor.');
-            }
+function sincronizarCheckAllHeader() {
+    const checkAll = document.getElementById('checkAll');
+    if (!checkAll) return;
+    if (solicitudesFiltradas.length === 0) {
+        checkAll.checked = false;
+        checkAll.disabled = true;
+        return;
+    }
+    checkAll.disabled = false;
+    const todosSeleccionados = solicitudesFiltradas.every(s => solicitudesSeleccionadas.has(s.id));
+    checkAll.checked = todosSeleccionados;
+}
+
+function actualizarBotoneraSeleccion() {
+    const btn = document.getElementById('btnExportarSeleccionados');
+    const badge = document.getElementById('cantSeleccionados');
+    const cant = solicitudesSeleccionadas.size;
+    if (badge) badge.innerText = cant;
+    if (btn) {
+        if (cant > 0) {
+            btn.classList.remove('d-none');
+            btn.classList.add('d-inline-flex');
+        } else {
+            btn.classList.add('d-none');
+            btn.classList.remove('d-inline-flex');
         }
+    }
+}
 
-        function mostrarModalOutput(creds) {
-            if (!creds) return;
-            
-            let textoResumen = `=== ALTA DE USUARIO CONFIRMADA ===\n\n`;
+async function exportarSeleccionados() {
+    const ids = Array.from(solicitudesSeleccionadas);
+    if (ids.length === 0) return;
 
-            if (creds.es_fuera_de_nomina) {
-                textoResumen += `[ TIPO: EMPLEADO FUERA DE NÓMINA ]\n`;
-                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
-                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
-                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
-                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
-                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
+    try {
+        mostrarToast('Generando planilla de exportación en Excel...');
+        const response = await fetch('/api/solicitudes/exportar-excel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids })
+        });
+
+        if (!response.ok) throw new Error('Error al exportar registros a Excel');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Reporte_Aprovisionamiento_Lote_${Date.now()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        mostrarToast('✓ Planilla Excel descargada con éxito');
+    } catch (err) {
+        alert('Error al exportar lote: ' + err.message);
+    }
+}
+
+// ================================================================
+// MODAL DE PREVISUALIZACIÓN DE CREDENCIALES
+// ================================================================
+async function abrirPreview(id, abrirModal = true) {
+    document.getElementById('solicitudIdActual').value = id;
+    solicitudIdActualParaPDF = id;
+
+    const container = document.getElementById('previewContent');
+    const alertBox  = document.getElementById('modalAlert');
+    const stepper   = document.getElementById('stepperContainer');
+    const btnConfirmar = document.getElementById('btnConfirmarAlta');
+    const btnRecalcular = document.getElementById('btnRecalcular');
+
+    alertBox.classList.add('d-none');
+    alertBox.innerText = '';
+    stepper.classList.add('d-none');
+    btnConfirmar.disabled = true;
+    btnRecalcular.disabled = true;
+
+    // Buscar solicitud en caché local para poblar el header del modal inmediatamente
+    const sol = todasLasSolicitudes.find(s => s.id === id);
+    if (sol) {
+        document.getElementById('previewNombreCompleto').innerText = `${sol.nombre || ''} ${sol.apellido || ''}`;
+        document.getElementById('previewAvatar').innerText = ((sol.nombre ? sol.nombre[0] : '') + (sol.apellido ? sol.apellido[0] : '')).toUpperCase();
+        document.getElementById('previewReportaA').innerText = `Reporta a: ${sol.reporta_a || 'No especificado'}`;
+        document.getElementById('previewDni').innerText = sol.dni || '-';
+        document.getElementById('previewLegajo').innerText = sol.legajo || '-';
+        document.getElementById('previewPerfilBadge').innerHTML = `<span class="badge ${obtenerColorPerfil(sol.perfil_ad)}">${sol.perfil_ad || 'Operador'}</span>`;
+    }
+
+    container.innerHTML = `
+      <div class="text-center py-5 text-muted">
+        <span class="spinner-border spinner-border-sm text-primary me-2"></span>
+        Consultando disponibilidad en Active Directory, Google Workspace y NeoTel...
+      </div>`;
+
+    if (abrirModal) {
+        const modalEl = document.getElementById('modalPreview');
+        let modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (!modalInstance) modalInstance = new bootstrap.Modal(modalEl);
+        modalInstance.show();
+    }
+
+    try {
+        const response = await fetch(`/api/solicitudes/${id}/preview`);
+        const data = await response.json();
+
+        if (response.ok) {
+            previewActualCache = data;
+            const esFN = Boolean(data.es_fuera_de_nomina);
+            btnConfirmar.disabled = false;
+            btnRecalcular.disabled = false;
+
+            if (esFN) {
+                // Vista Fuera de Nómina
+                container.innerHTML = `
+                  <div class="alert alert-warning py-2 small mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle-fill fs-5 text-warning"></i>
+                    <div>
+                      <strong>Personal Fuera de Nómina:</strong> No se crearán cuentas de Active Directory, Correo Gmail ni VPN Fortinet. Se aprovisionará únicamente telefonía NeoTel y extensión de audio SIP.
+                    </div>
+                  </div>
+
+                  <div class="row g-3">
+                    <!-- NeoTel Telemarketer -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-success fw-bold small">
+                          <i class="bi bi-telephone-fill"></i> NeoTel (Telemarketer)
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Usuario Agente:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.usuario_neo || ''}')">
+                            ${data.usuario_neo || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Contraseña (9 + Legajo):</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_neo || ''}')">
+                            ${data.clave_neo || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- NeoTel X-Lite -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-info fw-bold small">
+                          <i class="bi bi-headset"></i> Posición / Softphone (X-Lite)
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Dispositivo SIP:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.posicion_xlite || ''}')">
+                            ${data.posicion_xlite || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Contraseña SIP:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_xlite || ''}')">
+                            ${data.clave_xlite || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
             } else {
-                textoResumen += `[ Active Directory / Mail ]\n`;
-                textoResumen += `• Usuario AD: ${creds.usuario_ad || '-'}\n`;
-                textoResumen += `• Mail Corporativo: ${creds.email || '-'}\n`;
-                textoResumen += `• Clave Predeterminada: ${creds.clave_ad_mail || '-'}\n\n`;
-                
-                textoResumen += `[ Fortinet VPN ]\n`;
-                textoResumen += `• Usuario Fortinet: ${creds.usuario_fortinet || '-'}\n`;
-                textoResumen += `• Clave (DNI): ${creds.clave_fortinet || '-'}\n\n`;
+                // Vista Empleado Estándar (Completo)
+                container.innerHTML = `
+                  <div class="row g-3">
+                    <!-- AD & Gmail -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                          <span class="d-flex align-items-center gap-2 text-primary fw-bold small">
+                            <i class="bi bi-hdd-network-fill"></i> Active Directory &amp; Gmail
+                          </span>
+                          <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size: 0.65rem;">Principal</span>
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Usuario AD / SAMAccount:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.usuario_ad || ''}')">
+                            ${data.usuario_ad || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Correo Corporativo:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.email || ''}')">
+                            ${data.email || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Contraseña Inicial:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_ad_mail || ''}')">
+                            ${data.clave_ad_mail || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-                textoResumen += `[ Telefonía NeoTel / Posición ]\n`;
-                textoResumen += `• Usuario NEO: ${creds.usuario_neo || '-'}\n`;
-                textoResumen += `• Clave NEO: ${creds.clave_neo || '-'}\n`;
-                textoResumen += `• Dispositivo Posición (X-Lite): ${creds.posicion_xlite || '-'}\n`;
-                textoResumen += `• Clave Posición: ${creds.clave_xlite || '-'}\n`;
-            }
-            textoResumen += `=================================`;
+                    <!-- Fortinet VPN -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                          <span class="d-flex align-items-center gap-2 text-danger fw-bold small">
+                            <i class="bi bi-shield-lock-fill"></i> FortiGate VPN (100F)
+                          </span>
+                          <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size: 0.65rem;">Remoto</span>
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Usuario VPN (NombreApellido):</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.usuario_fortinet || ''}')">
+                            ${data.usuario_fortinet || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Contraseña (DNI):</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_fortinet || ''}')">
+                            ${data.clave_fortinet || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Grupo de Seguridad:</span>
+                          <span class="badge bg-light text-secondary border font-monospace mt-1">VPN_Usuarios_remotos</span>
+                        </div>
+                      </div>
+                    </div>
 
-            document.getElementById('outputTextoFormateado').value = textoResumen;
-            
-            const modalOutputEl = document.getElementById('modalOutputCredenciales');
-            let modalOutput = bootstrap.Modal.getInstance(modalOutputEl);
-            if (!modalOutput) {
-                modalOutput = new bootstrap.Modal(modalOutputEl);
+                    <!-- NeoTel Telemarketer -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-success fw-bold small">
+                          <i class="bi bi-telephone-fill"></i> NeoTel (Telemarketer)
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Usuario Agente:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.usuario_neo || ''}')">
+                            ${data.usuario_neo || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Contraseña (9 + Legajo):</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_neo || ''}')">
+                            ${data.clave_neo || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- NeoTel Posición X-Lite -->
+                    <div class="col-12 col-md-6">
+                      <div class="service-card-modern">
+                        <div class="d-flex align-items-center gap-2 mb-2 text-info fw-bold small">
+                          <i class="bi bi-headset"></i> Posición / Softphone (X-Lite)
+                        </div>
+                        <div class="mb-2">
+                          <span class="text-muted small d-block">Dispositivo SIP:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.posicion_xlite || ''}')">
+                            ${data.posicion_xlite || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                        <div>
+                          <span class="text-muted small d-block">Contraseña SIP:</span>
+                          <span class="cred-copy-pill mt-1" onclick="copiarTexto('${data.clave_xlite || ''}')">
+                            ${data.clave_xlite || '-'} <i class="bi bi-clipboard ms-1 text-muted"></i>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                `;
             }
-            modalOutput.show();
+        } else {
+            container.innerHTML = `<div class="alert alert-danger mb-0">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i> Error al generar previsualización: ${data.detail || 'Desconocido'}
+            </div>`;
+        }
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger mb-0">
+            <i class="bi bi-wifi-off me-1"></i> Error de conexión con el servidor al generar previsualización.
+        </div>`;
+    }
+}
+
+async function recalcularPreview() {
+    const id = document.getElementById('solicitudIdActual').value;
+    const btn = document.getElementById('btnRecalcular');
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Re-verificando...`;
+    await abrirPreview(id, false);
+    btn.disabled = false;
+    btn.innerHTML = `<i class="bi bi-arrow-repeat me-1"></i> Re-verificar Disponibilidad`;
+    mostrarToast('Disponibilidad y colisiones recalculadas');
+}
+
+// ================================================================
+// STEPPER Y EJECUCIÓN DEL ORQUESTADOR
+// ================================================================
+function resetStepper() {
+    Object.values(STEPS_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.className = 'step-item';
+    });
+    const bar = document.getElementById('progressBar');
+    if (bar) bar.style.width = '0%';
+}
+
+function setStepState(stepId, state) {
+    const el = document.getElementById(stepId);
+    if (!el) return;
+    el.classList.remove('active', 'done', 'error', 'omitido');
+    if (state) el.classList.add(state);
+}
+
+function animarStepper(esFueraDeNomina) {
+    resetStepper();
+    const steps = esFueraDeNomina
+        ? ['step-neotel']
+        : ['step-ad', 'step-gmail', 'step-neotel', 'step-forti'];
+
+    if (esFueraDeNomina) {
+        ['step-ad', 'step-gmail', 'step-forti'].forEach(s => setStepState(s, 'omitido'));
+    }
+
+    const progressBar = document.getElementById('progressBar');
+    let i = 0;
+
+    function avanzar() {
+        if (i > 0) setStepState(steps[i - 1], 'done');
+        if (i < steps.length) {
+            setStepState(steps[i], 'active');
+            if (progressBar) progressBar.style.width = `${Math.round(((i + 0.5) / steps.length) * 100)}%`;
+            i++;
+            setTimeout(avanzar, 850);
+        }
+    }
+    avanzar();
+}
+
+function aplicarResultadosStepper(estadoServicios) {
+    if (!estadoServicios) return;
+    let completados = 0;
+    let total = 0;
+
+    Object.entries(STEPS_MAP).forEach(([clave, stepId]) => {
+        const svc = estadoServicios[clave];
+        if (!svc) return;
+        if (svc.status === 'omitido') {
+            setStepState(stepId, 'omitido');
+        } else if (svc.status === 'success') {
+            setStepState(stepId, 'done');
+            completados++;
+            total++;
+        } else {
+            setStepState(stepId, 'error');
+            total++;
+        }
+    });
+
+    const pct = total > 0 ? Math.round((completados / total) * 100) : 100;
+    const bar = document.getElementById('progressBar');
+    if (bar) {
+        bar.style.width = `${pct}%`;
+        bar.style.backgroundColor = pct === 100 ? 'var(--brand-success)' : 'var(--brand-warning)';
+    }
+}
+
+// ================================================================
+// CONFIRMAR Y EJECUTAR ALTA EN EL BACKEND
+// ================================================================
+async function confirmarAlta() {
+    const id            = document.getElementById('solicitudIdActual').value;
+    const btnConfirmar  = document.getElementById('btnConfirmarAlta');
+    const btnRecalcular = document.getElementById('btnRecalcular');
+    const btnCancelar   = document.getElementById('btnCancelarPreview');
+    const alertBox      = document.getElementById('modalAlert');
+    const stepper       = document.getElementById('stepperContainer');
+    const container     = document.getElementById('previewContent');
+
+    const esFN = previewActualCache && previewActualCache.es_fuera_de_nomina;
+
+    btnConfirmar.disabled  = true;
+    btnRecalcular.disabled = true;
+    btnCancelar.disabled   = true;
+    btnConfirmar.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span> Ejecutando...`;
+    alertBox.classList.add('d-none');
+
+    // Desplegar stepper y arrancar animación
+    stepper.classList.remove('d-none');
+    container.innerHTML = '';
+    animarStepper(esFN);
+
+    try {
+        const response = await fetch(`/api/solicitudes/${id}/aprobar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        // Aplicar resultados reales del orquestador al stepper
+        aplicarResultadosStepper(data.estado_servicios);
+
+        // Conflicto de duplicidad (409)
+        if (response.status === 409) {
+            alertBox.innerText = `Conflicto de colisión: ${data.detail || 'Credenciales ya asignadas en Active Directory'}. Recalculando propuesta...`;
+            alertBox.classList.remove('d-none');
+            stepper.classList.add('d-none');
+            await abrirPreview(id, false);
+            return;
         }
 
-        function copiarOutputTexto() {
-            const copyText = document.getElementById('outputTextoFormateado');
-            copyText.select();
-            document.execCommand('copy');
-            alert('¡Credenciales copiadas al portapapeles!');
+        if (response.ok) {
+            // Breve pausa para permitir apreciar la finalización del stepper
+            await new Promise(r => setTimeout(r, 600));
+
+            // Cerrar modal de preview
+            const modalPreviewEl = document.getElementById('modalPreview');
+            const modalPreviewInst = bootstrap.Modal.getInstance(modalPreviewEl);
+            if (modalPreviewInst) modalPreviewInst.hide();
+
+            // Abrir modal de salida con credenciales
+            const credFinal = data.credenciales || previewActualCache;
+            mostrarModalOutput(credFinal, data.estado_servicios, data.pdf_generado, id);
+
+            // Refrescar tabla en segundo plano
+            cargarSolicitudes(false);
+        } else {
+            stepper.classList.add('d-none');
+            alertBox.innerText = 'Error al ejecutar alta: ' + (data.detail || data.message || 'Error desconocido');
+            alertBox.classList.remove('d-none');
         }
 
-        // Carga inicial y auto-refresco cada 10s
-        cargarSolicitudes();
-        setInterval(cargarSolicitudes, 10000);
-    </script>
+    } catch (err) {
+        stepper.classList.add('d-none');
+        alertBox.innerText = 'Error de comunicación con el servidor durante la ejecución.';
+        alertBox.classList.remove('d-none');
+    } finally {
+        btnConfirmar.disabled  = false;
+        btnRecalcular.disabled = false;
+        btnCancelar.disabled   = false;
+        btnConfirmar.innerHTML = `<i class="bi bi-rocket-takeoff-fill me-1"></i> Confirmar y Ejecutar Alta`;
+    }
+}
+
+// ================================================================
+// VER CREDENCIALES DE SOLICITUD YA PROCESADA
+// ================================================================
+async function verCredenciales(id) {
+    solicitudIdActualParaPDF = id;
+    try {
+        mostrarToast('Cargando credenciales guardadas...');
+        const response = await fetch(`/api/solicitudes/${id}/preview`);
+        const data = await response.json();
+        if (response.ok) {
+            mostrarModalOutput(data, null, true, id);
+        } else {
+            alert('No se pudieron recuperar las credenciales: ' + (data.detail || 'Error desconocido'));
+        }
+    } catch (err) {
+        alert('Error de conexión al obtener credenciales.');
+    }
+}
+
+// ================================================================
+// MODAL DE OUTPUT / SALIDA DE CREDENCIALES
+// ================================================================
+function mostrarModalOutput(creds, estadoServicios, pdfGenerado, solicitudId) {
+    if (!creds) return;
+    solicitudIdActualParaPDF = solicitudId || solicitudIdActualParaPDF;
+
+    const hayErrores = estadoServicios &&
+        Object.values(estadoServicios).some(s => s.status === 'error');
+
+    const header = document.getElementById('modalOutputHeader');
+    const label  = document.getElementById('modalOutputLabel');
+    const headerIcon = document.getElementById('modalOutputHeaderIcon');
+
+    if (hayErrores) {
+        header.style.backgroundColor = 'var(--brand-warning) !important';
+        header.className = 'modal-header text-white border-0 py-3 px-4';
+        label.innerHTML = 'Alta Procesada con Advertencias / Errores';
+        if (headerIcon) headerIcon.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-warning"></i>';
+    } else {
+        header.style.backgroundColor = 'var(--brand-success) !important';
+        header.className = 'modal-header text-white border-0 py-3 px-4';
+        label.innerHTML = 'Alta Procesada Exitosamente';
+        if (headerIcon) headerIcon.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
+    }
+
+    // Badges de Servicios
+    const badgesContainer = document.getElementById('estadoServiciosBadges');
+    const badgesSection   = document.getElementById('estadoServiciosContainer');
+    if (estadoServicios) {
+        badgesContainer.innerHTML = '';
+        const iconos = { success: '✓', error: '✕', omitido: '⏭' };
+        Object.values(estadoServicios).forEach(svc => {
+            const colorClass = svc.status === 'success' ? 'bg-success'
+                             : svc.status === 'error'   ? 'bg-danger'
+                             : 'bg-secondary';
+            badgesContainer.innerHTML += `
+              <span class="badge ${colorClass} d-inline-flex align-items-center gap-1 py-1 px-2" title="${svc.msg || ''}">
+                <strong>${iconos[svc.status] || '•'}</strong> ${svc.label}
+              </span>`;
+        });
+        badgesSection.classList.remove('d-none');
+    } else {
+        badgesSection.classList.add('d-none');
+    }
+
+    // Cards Interactivas de Credenciales
+    const cardsContainer = document.getElementById('credsCardsContainer');
+    cardsContainer.innerHTML = '';
+    cardsContainer.classList.remove('d-none');
+
+    const fn = Boolean(creds.es_fuera_de_nomina);
+
+    function campoCred(label, val) {
+        if (!val) return '';
+        return `
+          <div class="mb-1">
+            <span class="text-muted small">${label}:</span>
+            <span class="cred-copy-pill ms-1" onclick="copiarTexto('${val}')">
+              ${val} <i class="bi bi-clipboard ms-1 text-muted"></i>
+            </span>
+          </div>`;
+    }
+
+    let cardsHtml = '<div class="row g-2">';
+    if (!fn) {
+        cardsHtml += `
+          <div class="col-12 col-md-6">
+            <div class="service-card-modern">
+              <div class="fw-bold small text-primary mb-2"><i class="bi bi-hdd-network me-1"></i> Active Directory &amp; Gmail</div>
+              ${campoCred('Usuario AD', creds.usuario_ad)}
+              ${campoCred('Mail', creds.email)}
+              ${campoCred('Contraseña', creds.clave_ad_mail)}
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="service-card-modern">
+              <div class="fw-bold small text-danger mb-2"><i class="bi bi-shield-lock me-1"></i> FortiGate VPN</div>
+              ${campoCred('Usuario VPN', creds.usuario_fortinet)}
+              ${campoCred('Clave (DNI)', creds.clave_fortinet)}
+            </div>
+          </div>`;
+    }
+
+    cardsHtml += `
+      <div class="col-12 ${fn ? 'col-md-12' : 'col-md-12'}">
+        <div class="service-card-modern">
+          <div class="fw-bold small text-success mb-2"><i class="bi bi-telephone me-1"></i> Telefonía NeoTel &amp; Softphone</div>
+          <div class="row g-2">
+            <div class="col-12 col-md-6">
+              ${campoCred('Usuario NeoTel', creds.usuario_neo)}
+              ${campoCred('Clave NeoTel', creds.clave_neo)}
+            </div>
+            <div class="col-12 col-md-6">
+              ${campoCred('Posición X-Lite', creds.posicion_xlite)}
+              ${campoCred('Clave Posición', creds.clave_xlite)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    cardsContainer.innerHTML = cardsHtml;
+
+    // Resumen de Texto Formateado
+    let texto = `=========================================\n`;
+    texto += `ALTA DE USUARIO Y APROVISIONAMIENTO IT\n`;
+    texto += `=========================================\n\n`;
+    if (fn) {
+        texto += `[ COLABORADOR FUERA DE NÓMINA ]\n`;
+        texto += `• Usuario NeoTel:        ${creds.usuario_neo || '-'}\n`;
+        texto += `• Clave NeoTel:          ${creds.clave_neo || '-'}\n`;
+        texto += `• Dispositivo X-Lite:    ${creds.posicion_xlite || '-'}\n`;
+        texto += `• Clave Posición:        ${creds.clave_xlite || '-'}\n`;
+    } else {
+        texto += `[ ACTIVE DIRECTORY & GOOGLE WORKSPACE ]\n`;
+        texto += `• Usuario AD / SAM:      ${creds.usuario_ad || '-'}\n`;
+        texto += `• Correo Corporativo:    ${creds.email || '-'}\n`;
+        texto += `• Clave Inicial:         ${creds.clave_ad_mail || '-'}\n\n`;
+        texto += `[ FORTINET VPN 100F ]\n`;
+        texto += `• Usuario VPN:           ${creds.usuario_fortinet || '-'}\n`;
+        texto += `• Clave VPN (DNI):       ${creds.clave_fortinet || '-'}\n\n`;
+        texto += `[ TELEFONÍA NEOTEL ]\n`;
+        texto += `• Usuario Agente:        ${creds.usuario_neo || '-'}\n`;
+        texto += `• Clave (9 + Legajo):    ${creds.clave_neo || '-'}\n`;
+        texto += `• Dispositivo X-Lite:    ${creds.posicion_xlite || '-'}\n`;
+        texto += `• Clave SIP:             ${creds.clave_xlite || '-'}\n`;
+    }
+    texto += `\n=========================================`;
+    document.getElementById('outputTextoFormateado').value = texto;
+
+    // Control de Botón PDF
+    const btnPDF = document.getElementById('btnDescargarPDF');
+    if (pdfGenerado && solicitudIdActualParaPDF) {
+        btnPDF.classList.remove('d-none');
+    } else {
+        btnPDF.classList.add('d-none');
+    }
+
+    const modalOutputEl = document.getElementById('modalOutputCredenciales');
+    let modalOutput = bootstrap.Modal.getInstance(modalOutputEl);
+    if (!modalOutput) modalOutput = new bootstrap.Modal(modalOutputEl);
+    modalOutput.show();
+}
+
+// ================================================================
+// UTILIDADES: COPIAR AL PORTAPAPELES Y ACCIONES DE ARCHIVO
+// ================================================================
+function copiarTexto(texto) {
+    if (!texto) return;
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(texto).then(() => {
+            mostrarToast('✓ Copiado al portapapeles: ' + texto);
+        }).catch(() => fallbackCopiar(texto));
+    } else {
+        fallbackCopiar(texto);
+    }
+}
+
+function fallbackCopiar(texto) {
+    const el = document.createElement('textarea');
+    el.value = texto;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    mostrarToast('✓ Copiado al portapapeles');
+}
+
+function copiarOutputTexto() {
+    const textarea = document.getElementById('outputTextoFormateado');
+    if (textarea) {
+        textarea.select();
+        copiarTexto(textarea.value);
+    }
+}
+
+function descargarPDF() {
+    if (!solicitudIdActualParaPDF) return;
+    window.open(`/api/solicitudes/${solicitudIdActualParaPDF}/descargar-pdf`, '_blank');
+}
+
+function descargarPDFDirecto(id) {
+    if (!id) return;
+    window.open(`/api/solicitudes/${id}/descargar-pdf`, '_blank');
+}
+
+function exportarCSV() {
+    if (!solicitudIdActualParaPDF) return;
+    mostrarToast('Generando archivo Excel...');
+    fetch('/api/solicitudes/exportar-excel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [parseInt(solicitudIdActualParaPDF, 10)] })
+    })
+    .then(r => {
+        if (r.ok) return r.blob();
+        throw new Error('Error al generar el archivo');
+    })
+    .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href    = url;
+        a.download = `Alta_${solicitudIdActualParaPDF}_Credenciales.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        mostrarToast('✓ Archivo Excel descargado');
+    })
+    .catch(err => alert('Error al exportar: ' + err.message));
+}
+
+function mostrarToast(mensaje) {
+    const toast = document.getElementById('toastCopySuccess');
+    const toastText = document.getElementById('toastCopyText');
+    if (!toast || !toastText) return;
+    toastText.innerText = mensaje;
+    toast.classList.add('show');
+    clearTimeout(window.__toastTimeout);
+    window.__toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2200);
+}
+
+function cerrarAlertaGlobal() {
+    const box = document.getElementById('alertBox');
+    if (box) box.classList.add('d-none');
+}
+</script>
+
 </body>
 </html>

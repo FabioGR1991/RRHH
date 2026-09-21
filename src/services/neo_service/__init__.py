@@ -10,3 +10,6 @@ neo_service = service_instance
 
 async def crear_usuario_neotel(datos: dict) -> dict:
     return await service_instance.crear_usuario(datos)
+
+def usuario_existe_neotel(usuario: str) -> bool:
+    return service_instance.usuario_existe(usuario)

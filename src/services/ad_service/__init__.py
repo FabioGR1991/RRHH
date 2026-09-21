@@ -10,3 +10,6 @@ ad_service = service_instance
 
 async def crear_usuario_ad(datos: dict) -> dict:
     return await service_instance.crear_usuario(datos)
+
+async def existe_usuario_ad(username: str) -> bool:
+    return await service_instance.existe_usuario(username)
